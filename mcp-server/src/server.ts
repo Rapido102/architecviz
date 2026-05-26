@@ -14,7 +14,7 @@ import { mergeFragmentIntoArchitecture } from './merge.js';
 import { loadArchitectureState } from './architecture-state.js';
 import { deriveConnections } from './derive/connections.js';
 import { inspectArchitecture } from './inspect/index.js';
-import { autoscan } from './autoscan/index.js';
+import { autoscan, autoscanMany } from './autoscan/index.js';
 import { enrichmentPlan } from './enrich/plan.js';
 import { loadOrCreateArchitecture, writeArchitecture, targetFilePath } from './architecture-io.js';
 import { renameComponent } from './ops/rename.js';
@@ -71,6 +71,23 @@ server.tool(
     dry_run: z.boolean().optional().default(false).describe('Si true, renvoie ce qui serait détecté/stagé sans écrire'),
   },
   async ({ project_path, arch_name, project_key, dry_run }) => textResult(autoscan(project_path, arch_name, { dry_run, project_key })),
+);
+
+// ── autoscan_many ────────────────────────────────────────────────────────────
+server.tool(
+  'autoscan_many',
+  'Analyse plusieurs projets d\'un même SI en un seul appel MCP. Pour chaque projet, lance autoscan (détection stack, extraction squelette, staging) sous le même arch_name. Idéal pour les monorepos ou les architectures microservices. Ne fait PAS finalize — appeler finalize(arch_name) une fois tous les projets scannés.',
+  {
+    arch_name: z.string().describe('Nom de l\'architecture — identique pour tous les projets du même SI'),
+    projects: z.array(
+      z.object({
+        path: z.string().describe('Chemin absolu de la racine du projet'),
+        key: z.string().optional().describe('Clé du projet pour le staging multi-projet (défaut : nom du dossier)'),
+      }),
+    ).describe('Liste des projets à analyser'),
+    dry_run: z.boolean().optional().default(false).describe('Si true, simule la détection sans écrire dans le staging'),
+  },
+  async ({ arch_name, projects, dry_run }) => textResult(autoscanMany(arch_name, projects, { dry_run })),
 );
 
 // ── enrichment_plan ─────────────────────────────────────────────────────────

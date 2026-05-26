@@ -215,6 +215,46 @@ Combo idempotent : `derive_connections` + `merge_staged`. À appeler en fin de w
 ### `autoscan(project_path, arch_name, project_key?, dry_run?)`
 Point d'entrée d'extraction : détecte la nature du projet et lance les extracteurs adaptés, en stageant tous les squelettes (composants par projet). Préserve une identité déjà stagée (vise FULLSTACK). Ne fait pas finalize.
 
+### `autoscan_many(arch_name, projects, dry_run?)`
+Analyse **plusieurs projets en un seul appel MCP**. Identique à appeler `autoscan` en boucle, mais retourne un rapport agrégé. Idéal pour les monorepos ou les architectures microservices décrites dans un `CLAUDE.md`.
+
+`projects` est un tableau d'objets `{ path, key? }`. Si `key` est omis, il est dérivé du nom du dossier.
+
+```jsonc
+// Appel
+autoscan_many({
+  "arch_name": "mon-si",
+  "projects": [
+    { "path": "/workspace/frontend-react",   "key": "frontend"  },
+    { "path": "/workspace/api-spring",        "key": "api"       },
+    { "path": "/workspace/auth-service",      "key": "auth"      }
+  ]
+})
+
+// Résultat
+{
+  "arch_name": "mon-si",
+  "projects_scanned": 3,
+  "summary": {
+    "total_endpoints": 42,
+    "total_components": 7,
+    "total_da_candidates": 18,
+    "errors": 0
+  },
+  "results": [
+    { "project_path": "/workspace/frontend-react", "project_key": "frontend", "status": "ok",
+      "result": { "profile": { "type_this_project": "FRONTEND" }, "staged": [...], ... } },
+    { "project_path": "/workspace/api-spring",     "project_key": "api",      "status": "ok",
+      "result": { "profile": { "type_this_project": "BACKEND"  }, "staged": [...], ... } },
+    { "project_path": "/workspace/auth-service",   "project_key": "auth",     "status": "ok",
+      "result": { "profile": { "type_this_project": "BACKEND"  }, "staged": [...], ... } }
+  ],
+  "next_step": "3 projet(s) stagé(s). Lancer enrichment_plan(\"mon-si\") pour combler les champs sémantiques, puis finalize(\"mon-si\")."
+}
+```
+
+Un projet qui plante (chemin incorrect, stack inconnue) ne bloque pas les autres — son entrée apparaît avec `"status": "error"` et un message dans `"error"`. Les autres projets sont stagés normalement.
+
 ### Outils de maintenance (sur le fichier finalisé)
 
 **`rename_component(arch_name, old_id, new_id, dry_run?)`** — renomme un composant partout (1→1) : `components[].id`, `connections.from/to` (+ id régénéré), `used_by[]`, `data_access[].component_id`, `warnings[].component`. Refuse si `new_id` existe.
@@ -251,43 +291,66 @@ Les **sections de composants** (`components_*`) sont stagées **par projet** (`p
 
 ## Multi-projets : une architecture, plusieurs scans
 
-Quand un SI réel a plusieurs projets distincts (ex: MFE React + API Spring), tu les scannes l'un après l'autre **avec le même `arch_name`**. Le staging et le merge gèrent la fusion automatiquement.
+Quand un SI réel a plusieurs projets distincts (ex: MFE React + API Spring), deux approches sont possibles.
+
+### Option A — `autoscan_many` (un seul appel, recommandé)
+
+Idéal quand tous les chemins de projet sont connus à l'avance (monorepo, `CLAUDE.md` de SI).
+
+```text
+[USER] Scan les projets cegec en une passe. arch_name="cegec".
+
+[CLAUDE]
+  → autoscan_many({
+      arch_name: "cegec",
+      projects: [
+        { path: "/workspace/cegec-frontend", key: "frontend" },
+        { path: "/workspace/cegec-api",      key: "api"      },
+        { path: "/workspace/cegec-auth",     key: "auth"     }
+      ]
+    })
+    → stage automatique de tous les squelettes détectés
+    → résumé : 3 projets OK, 56 endpoints, 21 candidats data_access
+
+  → enrichment_plan("cegec")
+    → 8 tâches P1 (data_access, api_calls), 3 tâches P3 (descriptions)
+
+  → (passe LLM d'enrichissement — lit les controllers, complète les champs)
+
+  → finalize("cegec")
+    → derive_connections + merge_staged
+    → src/architectures/cegec.json ✅
+```
+
+### Option B — scans séquentiels manuels
+
+Pratique quand les projets sont ouverts un par un dans l'IDE, ou dans des workspaces différents.
 
 ```text
 # 1. Ouvrir le MFE React dans VS Code
 [USER] Scan ce projet pour architectviz, arch_name="cegec", sections identity + components_frontend.
 
 [CLAUDE]
-  → extract_identity / extract_components_frontend
-  → stage_fragment("identity",          ..., "cegec")
-  → stage_fragment("components_frontend", ..., "cegec")
-    → .architectviz/staging/cegec/{identity,components_frontend}.json
+  → autoscan("/workspace/cegec-frontend", "cegec", { project_key: "frontend" })
+    → .architectviz/staging/cegec/{identity, projects/frontend/components_frontend}.json
 
-# 2. Ouvrir l'API Spring dans VS Code (autre fenêtre ou réutiliser)
-[USER] Scan ce projet pour architectviz, arch_name="cegec", section components_backend (skip identity).
+# 2. Ouvrir l'API Spring dans VS Code
+[USER] Scan ce projet pour architectviz, arch_name="cegec". Skip identity, c'est déjà fait.
 
 [CLAUDE]
-  → extract_components_backend
-  → stage_fragment("components_backend", ..., "cegec")
-    → .architectviz/staging/cegec/components_backend.json
+  → autoscan("/workspace/cegec-api", "cegec", { project_key: "api" })
+    → .architectviz/staging/cegec/projects/api/components_backend.json
 
-# 3. Dériver les connexions cross-projet
-[USER] Dérive les connexions ArchitectViz pour cegec.
-
-[CLAUDE]
-  → derive_connections("cegec")
-    → match GET /api/v1/items (MFE) ↔ /api/v1/items (API) → ✅ MAPPÉ
-    → stage_fragment("connections", ..., "cegec")
-
-# 4. Merger
-[USER] Merge le staging pour cegec.
+# 3. Finaliser (connexions + merge)
+[USER] Finalise ArchitectViz pour cegec.
 
 [CLAUDE]
-  → merge_staged("cegec")
-    → src/architectures/cegec.json contient identity + components (FE + BE) + connections
+  → finalize("cegec")
+    → derive_connections : GET /api/v1/items (FE) ↔ /api/v1/items (BE) → ✅ MAPPÉ
+    → merge_staged → src/architectures/cegec.json ✅
 ```
 
-`arch_name` est la **seule** clé de jointure. Tu peux scanner les deux projets dans le désordre, depuis deux IDEs différents, à des moments différents — tant que `arch_name` est le même, tout converge.
+`arch_name` est la **seule** clé de jointure. Tu peux scanner les projets dans n'importe quel ordre, depuis plusieurs IDEs, à des moments différents — tant que `arch_name` est le même, tout converge.
 
 ## Exemple complet — bout en bout
 
@@ -370,15 +433,4 @@ Pour ajuster la validation ou les stratégies de merge : édite [`extraction-man
 - [prompts/sections/](../prompts/sections/) — prompts compacts par section
 - [src/architectures/_empty.jsonc](../src/architectures/_empty.jsonc) — template annoté du format de sortie
 - [src/types.ts](../src/types.ts) — schéma TypeScript
-
-
-
-« Scan ce projet pour ArchitectViz, arch_name="cegec". Sections : identity, components_backend, components_data (si DB/cache détecté), components_external (si IAM/services tiers détectés). »
-
-« Scan ce projet pour ArchitectViz, arch_name="cegec" (même architecture). Section components_frontend. Ne refais pas identity, c'est déjà fait. »
-
-« Finalise ArchitectViz pour cegec. »
-
-
-lance l'autoscan sur ce projet, arch_name="nba"
 

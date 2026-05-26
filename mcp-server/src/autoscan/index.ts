@@ -1,6 +1,6 @@
-// autoscan : détecte la nature du projet, lance les extracteurs adaptés et stage
-// les squelettes. N'enchaîne PAS finalize (multi-projet → l'utilisateur finalise
-// une fois tous les projets scannés). Préserve l'identité déjà stagée (vise FULLSTACK).
+// autoscan / autoscan_many : détecte la nature du projet, lance les extracteurs
+// adaptés et stage les squelettes. N'enchaîne PAS finalize (multi-projet → l'utilisateur
+// finalise une fois tous les projets scannés). Préserve l'identité déjà stagée (vise FULLSTACK).
 
 import { extractIdentity } from '../extractors/identity.js';
 import { extractFrontendComponents } from '../extractors/components-frontend.js';
@@ -168,5 +168,85 @@ export function autoscan(projectPath: string, archName: string, options: { dry_r
     next_step:
       'Scanner les autres projets du même SI avec le même arch_name, puis : finalize(arch_name). ' +
       'Pour enrichir les champs sémantiques avant finalize, demander à Claude une passe de complétion (data_access, endpoints, api_calls).',
+  };
+}
+
+// ── autoscan_many ─────────────────────────────────────────────────────────────
+
+export interface AutoscanManyProjectInput {
+  path: string;
+  key?: string;
+}
+
+interface AutoscanManyProjectResult {
+  project_path: string;
+  project_key: string;
+  status: 'ok' | 'error';
+  result?: AutoscanResult;
+  error?: string;
+}
+
+export interface AutoscanManyResult {
+  arch_name: string;
+  projects_scanned: number;
+  results: AutoscanManyProjectResult[];
+  summary: {
+    total_endpoints: number;
+    total_components: number;
+    total_da_candidates: number;
+    errors: number;
+  };
+  next_step: string;
+}
+
+export function autoscanMany(
+  archName: string,
+  projects: AutoscanManyProjectInput[],
+  options: { dry_run?: boolean } = {},
+): AutoscanManyResult {
+  const results: AutoscanManyProjectResult[] = [];
+  let totalEndpoints = 0;
+  let totalComponents = 0;
+  let totalDaCandidates = 0;
+  let errors = 0;
+
+  for (const proj of projects) {
+    try {
+      const res = autoscan(proj.path, archName, { dry_run: options.dry_run, project_key: proj.key });
+      const endpointCount = res.coverage?.endpoints_extracted ?? 0;
+      const componentCount = res.staged.filter((s) => s.status === 'staged').reduce((sum, s) => sum + (s.count ?? 0), 0);
+      const daCount = res.data_access_candidates?.length ?? 0;
+      totalEndpoints += endpointCount;
+      totalComponents += componentCount;
+      totalDaCandidates += daCount;
+      results.push({ project_path: proj.path, project_key: res.project_key, status: 'ok', result: res });
+    } catch (err) {
+      errors++;
+      const key = proj.key ?? slugify(proj.path.replace(/[/\\]+$/, '').split(/[/\\]/).pop() ?? 'project');
+      results.push({
+        project_path: proj.path,
+        project_key: key,
+        status: 'error',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  const successCount = results.filter((r) => r.status === 'ok').length;
+
+  return {
+    arch_name: archName,
+    projects_scanned: projects.length,
+    results,
+    summary: {
+      total_endpoints: totalEndpoints,
+      total_components: totalComponents,
+      total_da_candidates: totalDaCandidates,
+      errors,
+    },
+    next_step:
+      successCount > 0
+        ? `${successCount} projet(s) stagé(s). Lancer enrichment_plan("${archName}") pour combler les champs sémantiques, puis finalize("${archName}").`
+        : `Tous les projets ont échoué — vérifier les chemins. Aucun fragment stagé pour "${archName}".`,
   };
 }
