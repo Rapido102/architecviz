@@ -48,6 +48,7 @@ import { ArchitectureConfig, Component, Connection as ArchConnection } from './t
 import { architectures, defaultArchitecture } from './architectures';
 import { CustomNode } from './components/CustomNode.tsx';
 import { CustomEdge } from './components/CustomEdge.tsx';
+import { EndpointNode } from './components/EndpointNode.tsx';
 import { JsonEditor } from './components/JsonEditor.tsx';
 import { ArchitectureEditor } from './components/architectureEditor/ArchitectureEditor.tsx';
 import { HealthPanel } from './components/HealthPanel.tsx';
@@ -67,6 +68,7 @@ import { stripJsonComments } from './lib/stripJsonComments.ts';
 
 const nodeTypes = {
   custom: CustomNode,
+  endpoint: EndpointNode,
 };
 
 const edgeTypes = {
@@ -88,8 +90,15 @@ export default function App() {
   const [dataFlow, setDataFlow] = useState<DataFlow | null>(null);
   const [activeFlowEdge, setActiveFlowEdge] = useState<FlowEdge | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showFlowSummary, setShowFlowSummary] = useState(true);
-  const [showLayersLegend, setShowLayersLegend] = useState(true);
+  const [showFlowSummary, setShowFlowSummary] = useState(() => {
+    try { return localStorage.getItem('av:showFlowSummary') !== 'false'; } catch { return true; }
+  });
+  const [showLayersLegend, setShowLayersLegend] = useState(() => {
+    try { return localStorage.getItem('av:showLayersLegend') !== 'false'; } catch { return true; }
+  });
+  const [endpointMode, setEndpointMode] = useState<'compact' | 'detailed'>(() => {
+    try { return (localStorage.getItem('av:endpointMode') as 'compact' | 'detailed') ?? 'compact'; } catch { return 'compact'; }
+  });
   const [view, setView] = useState<'graph' | 'endpoints' | 'data' | 'network'>('graph');
 
   // Cross-architecture links — resolved once over the whole registry.
@@ -186,8 +195,11 @@ export default function App() {
     setSaveStatus('idle');
   }, []);
 
+  const [endpointCtx, setEndpointCtx] = useState<{ compId: string; method: string; path: string } | null>(null);
+
   const handleLineageEndpoint = useCallback((componentId: string, method: string, path: string) => {
     setDataFlow(dataFlowForEndpoint(config, componentId, method, path));
+    setEndpointCtx({ compId: componentId, method: method.toUpperCase(), path });
     setView('graph');
   }, [config]);
 
@@ -201,7 +213,7 @@ export default function App() {
     setView('graph');
   }, [config]);
 
-  const clearLineage = useCallback(() => setDataFlow(null), []);
+  const clearLineage = useCallback(() => { setDataFlow(null); setEndpointCtx(null); }, []);
   const flowHighlight = useMemo<LineageHighlight | null>(
     () => (dataFlow ? { componentIds: dataFlow.componentIds, connectionIds: dataFlow.connectionIds } : null),
     [dataFlow],
@@ -248,7 +260,7 @@ export default function App() {
     }
   }, [debouncedJson]);
 
-  const updateGraph = useCallback((data: ArchitectureConfig, focusedLayers: Set<string>, lineageHighlight: LineageHighlight | null, links: Map<string, CrossLink>, archNameById: Map<string, string>, crossConnIds: Set<string>, healthByComponent: Map<string, ComponentHealth>, healthOverlay: boolean, flowByConn: Map<string, FlowEdge> | null, onNodeFlow: (id: string) => void) => {
+  const updateGraph = useCallback((data: ArchitectureConfig, focusedLayers: Set<string>, lineageHighlight: LineageHighlight | null, links: Map<string, CrossLink>, archNameById: Map<string, string>, crossConnIds: Set<string>, healthByComponent: Map<string, ComponentHealth>, healthOverlay: boolean, flowByConn: Map<string, FlowEdge> | null, onNodeFlow: (id: string) => void, epMode: 'compact' | 'detailed', onEndpointFlow: (compId: string, method: string, path: string) => void, epCtx: { compId: string; method: string; path: string } | null) => {
     try {
       const lineageActive = !!lineageHighlight;
       const initialNodes: Node[] = data.components.map((comp) => {
@@ -280,7 +292,22 @@ export default function App() {
         };
       });
 
-      const initialEdges: Edge[] = data.connections.map((conn) => {
+      // Lookup: "${compId}|||${METHOD}|||${path}" → endpoint node id (detailed mode only)
+      const epLookup = new Map<string, string>();
+      // Tracks ep node IDs that are linked as intermediate nodes in a cross-component connection
+      const linkedEpIds = new Set<string>();
+
+      if (epMode === 'detailed') {
+        data.components.forEach((comp) => {
+          comp.endpoints?.forEach((ep, idx) => {
+            epLookup.set(`${comp.id}|||${ep.method.toUpperCase()}|||${ep.path}`, `__ep__${comp.id}__${idx}`);
+          });
+        });
+      }
+
+      const ownershipEdgeStyle = { stroke: '#141414', strokeWidth: 1, strokeDasharray: '4 3' };
+
+      const initialEdges: Edge[] = data.connections.flatMap((conn) => {
         const sourceNode = data.components.find(c => c.id === conn.from);
         const targetNode = data.components.find(c => c.id === conn.to);
         const isCross = crossConnIds.has(conn.id);
@@ -291,31 +318,145 @@ export default function App() {
         const isFocused = lineageActive ? inLineage : (isCross || bothForeign || !!layerFocused);
         const purple = (lineageActive && inLineage) || isCross;
 
-        return {
+        const edgeStyle = {
+          stroke: purple ? '#7c3aed' : '#141414',
+          strokeWidth: purple ? 3 : 2,
+          strokeDasharray: isCross ? '6 3' : undefined,
+          opacity: isFocused ? 1 : 0.15,
+        };
+        const edgeMarker = {
+          type: MarkerType.ArrowClosed,
+          color: isFocused ? (purple ? '#7c3aed' : '#141414') : '#14141422',
+        };
+        const edgeData = { ...conn, isFocused, crossArch: isCross, flowEdge: flowByConn?.get(conn.id) };
+
+        if (epMode === 'detailed') {
+          // Model: caller → [endpoint] → owner  (composant ⇒ endpoint ⇒ composant)
+          // feStr: "METHOD /path" (optional, from source side)
+          // beStr: "/path", beMethod: "METHOD" (target endpoint, on conn.to)
+          const resolveChain = (feStr: string | undefined, beStr: string, beMethod: string, idx: number): Edge[] | null => {
+            const epId = epLookup.get(`${conn.to}|||${beMethod.toUpperCase()}|||${beStr}`);
+            if (!epId) return null;
+            linkedEpIds.add(epId);
+
+            let srcId: string = conn.from;
+            if (feStr) {
+              const sp = feStr.indexOf(' ');
+              if (sp !== -1) {
+                const feMethod = feStr.slice(0, sp).toUpperCase();
+                const fePath = feStr.slice(sp + 1);
+                srcId = epLookup.get(`${conn.from}|||${feMethod}|||${fePath}`) ?? conn.from;
+              }
+            }
+
+            // When a specific endpoint is targeted by lineage, only highlight its matching edges.
+            // Inbound connections to the target component are filtered per-mapping;
+            // outbound connections (data_access) keep the connection-level focus.
+            let epIsFocused = isFocused;
+            if (epCtx && lineageActive && isFocused && conn.to === epCtx.compId) {
+              epIsFocused = beMethod.toUpperCase() === epCtx.method && beStr === epCtx.path;
+            }
+            const epStyle = { ...edgeStyle, opacity: epIsFocused ? 1 : (lineageActive ? 0.05 : 0.15) };
+            const epMarker = { type: MarkerType.ArrowClosed, color: epIsFocused ? (purple ? '#7c3aed' : '#141414') : '#14141411' };
+
+            return [
+              // caller → endpoint
+              {
+                id: `${conn.id}__epl_call__${idx}`,
+                source: srcId,
+                target: epId,
+                label: conn.protocol,
+                type: 'custom',
+                animated: epIsFocused,
+                style: epStyle,
+                markerEnd: epMarker,
+                data: edgeData,
+              },
+              // endpoint → owner  (thin dashed, shows ownership)
+              {
+                id: `${conn.id}__epl_own__${idx}`,
+                source: epId,
+                target: conn.to,
+                type: 'custom',
+                style: { ...ownershipEdgeStyle, opacity: epIsFocused ? 0.6 : (lineageActive ? 0.05 : 0.15) },
+                animated: false,
+                markerEnd: { type: MarkerType.ArrowClosed, color: epIsFocused ? '#141414' : '#14141422' },
+              },
+            ];
+          };
+
+          const epEdges: Edge[] = [];
+          (conn.endpoint_mappings ?? []).forEach((m, i) => {
+            const chain = resolveChain(m.frontend_endpoint, m.backend_endpoint, m.method, i);
+            if (chain) epEdges.push(...chain);
+          });
+          if (epEdges.length === 0) {
+            (conn.endpoints ?? []).forEach((ep, i) => {
+              const chain = resolveChain(ep.frontend_call, ep.backend_endpoint, ep.method, i);
+              if (chain) epEdges.push(...chain);
+            });
+          }
+          if (epEdges.length > 0) return epEdges;
+          // No endpoint resolution → fall through to component-level edge
+        }
+
+        return [{
           id: conn.id,
           source: conn.from,
           target: conn.to,
           label: conn.protocol,
           type: 'custom',
           animated: isFocused,
-          style: {
-            stroke: purple ? '#7c3aed' : '#141414',
-            strokeWidth: purple ? 3 : 2,
-            strokeDasharray: isCross ? '6 3' : undefined,
-            opacity: isFocused ? 1 : 0.15
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: isFocused ? (purple ? '#7c3aed' : '#141414') : '#14141422',
-          },
-          data: {
-            ...conn,
-            isFocused,
-            crossArch: isCross,
-            flowEdge: flowByConn?.get(conn.id),
-          }
-        };
+          style: edgeStyle,
+          markerEnd: edgeMarker,
+          data: edgeData,
+        }];
       });
+
+      if (epMode === 'detailed') {
+        data.components.forEach((comp) => {
+          if (!comp.endpoints?.length) return;
+          const parentNode = initialNodes.find((n) => n.id === comp.id);
+          const parentOpacity = parentNode ? (parentNode.style?.opacity ?? 1) : 1;
+          comp.endpoints.forEach((ep, idx) => {
+            const epId = `__ep__${comp.id}__${idx}`;
+            // Per-endpoint opacity: when lineage targets a specific endpoint, fade all others.
+            let epOpacity = parentOpacity;
+            if (epCtx && lineageActive) {
+              const isTarget = comp.id === epCtx.compId &&
+                ep.method.toUpperCase() === epCtx.method &&
+                ep.path === epCtx.path;
+              epOpacity = isTarget ? 1 : (lineageHighlight?.componentIds.has(comp.id) ? 0.15 : 0.05);
+            }
+            initialNodes.push({
+              id: epId,
+              type: 'endpoint',
+              data: {
+                method: ep.method,
+                path: ep.path,
+                authenticated: ep.authenticated,
+                description: ep.description,
+                parentCompId: comp.id,
+                onEndpointFlow,
+              },
+              style: { opacity: epOpacity },
+              position: { x: 0, y: 0 },
+            });
+            // Orphan endpoints (no cross-component connection) are shown below their owner
+            if (!linkedEpIds.has(epId)) {
+              initialEdges.push({
+                id: `__ep_edge__${comp.id}__${idx}`,
+                source: comp.id,
+                target: epId,
+                type: 'custom',
+                style: ownershipEdgeStyle,
+                markerEnd: { type: MarkerType.ArrowClosed, color: '#141414' },
+                animated: false,
+              });
+            }
+          });
+        });
+      }
 
       const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
         initialNodes,
@@ -333,8 +474,8 @@ export default function App() {
 
   useEffect(() => {
     const data = { ...config, components: mergedGraph.components, connections: mergedGraph.connections, layers: mergedGraph.layers };
-    updateGraph(data, visibleLayers, flowHighlight, currentLinks, mergedGraph.archNameById, mergedGraph.crossConnIds, health, showHealthOverlay, dataFlow?.byConnId ?? null, handleNodeFlow);
-  }, [config, updateGraph, visibleLayers, flowHighlight, currentLinks, mergedGraph, health, showHealthOverlay, dataFlow, handleNodeFlow]);
+    updateGraph(data, visibleLayers, flowHighlight, currentLinks, mergedGraph.archNameById, mergedGraph.crossConnIds, health, showHealthOverlay, dataFlow?.byConnId ?? null, handleNodeFlow, endpointMode, handleLineageEndpoint, endpointCtx);
+  }, [config, updateGraph, visibleLayers, flowHighlight, currentLinks, mergedGraph, health, showHealthOverlay, dataFlow, handleNodeFlow, endpointMode, handleLineageEndpoint, endpointCtx]);
 
   // Emphasize the active flow step's edge + its endpoints on the graph — style/data
   // only, no re-layout (avoids reshuffling node positions on every step).
@@ -458,7 +599,11 @@ export default function App() {
                view !== 'graph' && 'opacity-30 pointer-events-none',
              )}>
                 <button
-                  onClick={() => setShowFlowSummary(!showFlowSummary)}
+                  onClick={() => setShowFlowSummary(v => {
+                    const next = !v;
+                    try { localStorage.setItem('av:showFlowSummary', String(next)); } catch {}
+                    return next;
+                  })}
                   className={cn(
                     "px-3 h-8 text-[10px] font-mono border uppercase transition-all",
                     showFlowSummary ? "bg-brand-ink text-white border-brand-ink" : "bg-white text-brand-ink border-brand-line opacity-50"
@@ -467,13 +612,31 @@ export default function App() {
                   Flow Summary
                 </button>
                 <button
-                  onClick={() => setShowLayersLegend(!showLayersLegend)}
+                  onClick={() => setShowLayersLegend(v => {
+                    const next = !v;
+                    try { localStorage.setItem('av:showLayersLegend', String(next)); } catch {}
+                    return next;
+                  })}
                   className={cn(
                     "px-3 h-8 text-[10px] font-mono border uppercase transition-all",
                     showLayersLegend ? "bg-brand-ink text-white border-brand-ink" : "bg-white text-brand-ink border-brand-line opacity-50"
                   )}
                 >
                   Layers
+                </button>
+                <button
+                  onClick={() => setEndpointMode(prev => {
+                    const next = prev === 'compact' ? 'detailed' : 'compact';
+                    try { localStorage.setItem('av:endpointMode', next); } catch {}
+                    return next;
+                  })}
+                  className={cn(
+                    "px-3 h-8 text-[10px] font-mono border uppercase transition-all",
+                    endpointMode === 'detailed' ? "bg-brand-ink text-white border-brand-ink" : "bg-white text-brand-ink border-brand-line opacity-50"
+                  )}
+                  title={endpointMode === 'compact' ? 'Afficher chaque endpoint comme nœud individuel' : 'Revenir au mode compact (badge de comptage)'}
+                >
+                  Endpoints ▦
                 </button>
                 <button
                   onClick={() => setShowHealthOverlay(v => !v)}

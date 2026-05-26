@@ -15,7 +15,12 @@
       "PowerShell(Set-Location 'C:\\\\Users\\\\Dylan\\\\Downloads\\\\architectviz\\\\mcp-server'; npm run build 2>&1 | Select-String -Pattern \"error TS|sync-core\" | Select-Object -Last 3; \"mcp build: $LASTEXITCODE\")",
       "PowerShell(Set-Location 'C:\\\\Users\\\\Dylan\\\\Downloads\\\\architectviz\\\\mcp-server'; npm run build 2>&1 | Select-String -Pattern \"error TS\" | Select-Object -Last 3; \"mcp: $LASTEXITCODE\")",
       "Bash(node /tmp/flow.mjs)",
-      "PowerShell(Set-Location 'C:\\\\Users\\\\Dylan\\\\Downloads\\\\architectviz'; npm run build 2>&1 | Select-String -Pattern \"built in|error TS\" | Select-Object -Last 3; \"build: $LASTEXITCODE\")"
+      "PowerShell(Set-Location 'C:\\\\Users\\\\Dylan\\\\Downloads\\\\architectviz'; npm run build 2>&1 | Select-String -Pattern \"built in|error TS\" | Select-Object -Last 3; \"build: $LASTEXITCODE\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Dylan\\\\Downloads\\\\architectviz\" -Recurse -Force)",
+      "Bash(node -e \"const d = require\\('./src/architectures/cegec.json'\\); const conns = d.connections.filter\\(c => c.endpoint_mappings?.length || c.endpoints?.length\\); console.log\\(JSON.stringify\\(conns.slice\\(0,2\\), null, 2\\)\\)\")",
+      "Bash(node -e \"const d = require\\('./src/architectures/cegec.json'\\); const conns = d.connections.filter\\(c => c.endpoints?.length\\); console.log\\(JSON.stringify\\(conns.slice\\(0,1\\), null, 2\\)\\)\")",
+      "Bash(node -e \"const files = ['alertapi','mailbox','nba','notify','curseur','cegec','isicrm','mock_archi']; files.forEach\\(f => { try { const d = require\\('./src/architectures/'+f+'.json'\\); const conns = d.connections?.filter\\(c => c.endpoints?.length\\) ?? []; if\\(conns.length\\) console.log\\(f, JSON.stringify\\(conns[0].endpoints?.slice\\(0,2\\), null, 2\\)\\); } catch\\(e\\){} }\\)\")",
+      "Bash(node -e \"const d = require\\('./src/architectures/cegec.json'\\); const bo = d.components.find\\(c=>c.id==='bo_cegec'\\); const be = d.components.find\\(c=>c.id==='backend_cegec_api'\\); console.log\\('BO endpoints:', JSON.stringify\\(bo?.endpoints?.slice\\(0,3\\), null,2\\)\\); console.log\\('BE endpoints:', JSON.stringify\\(be?.endpoints?.slice\\(0,3\\), null,2\\)\\);\")"
     ],
     "additionalDirectories": [
       "\\tmp"

@@ -62,52 +62,55 @@ export const CustomEdge = ({
         </>
       )}
       <EdgeLabelRenderer>
-        <div
-          style={{
-            position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            pointerEvents: 'all',
-            opacity: isFocused ? 1 : 0.4,
-          }}
-          className="nodrag nopan transition-opacity duration-300"
-        >
-          <div className={cn(
-            "bg-white border border-brand-line px-2 py-1 flex flex-col items-center gap-0.5 min-w-[60px]",
-            "hover:border-brand-ink transition-colors cursor-help group shadow-sm",
-            active && "border-purple-500 ring-2 ring-purple-300"
-          )}>
-            <div className="text-[9px] font-mono font-bold leading-none uppercase">
-                {String(label)}
-            </div>
+        {((label != null && label !== '') || hasDetails || flow) && (
+          <div
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              pointerEvents: 'all',
+              opacity: isFocused ? 1 : 0.4,
+            }}
+            className="nodrag nopan transition-opacity duration-300"
+          >
+            <div className={cn(
+              "bg-white border border-brand-line px-2 py-1 flex flex-col items-center gap-0.5 min-w-[60px]",
+              "hover:border-brand-ink transition-colors cursor-help group shadow-sm",
+              active && "border-purple-500 ring-2 ring-purple-300"
+            )}>
+              {label != null && label !== '' && (
+                <div className="text-[9px] font-mono font-bold leading-none uppercase">
+                  {String(label)}
+                </div>
+              )}
 
-            {flow && flow.labels.length > 0 && (
-              <div className="flex flex-col items-stretch gap-0.5 mt-1 max-w-[200px]">
-                {flow.labels.slice(0, 4).map((l, i) => (
-                  <FlowChip key={i} label={l} />
-                ))}
-                {flow.labels.length > 4 && (
-                  <div className="text-[8px] opacity-40 font-mono text-center">+{flow.labels.length - 4}</div>
-                )}
-                {flow.responseLabel && (
-                  <div className="text-[8px] font-mono text-green-700 truncate" title={flow.responseLabel}>
-                    ↑ {flow.responseLabel}
-                  </div>
-                )}
-              </div>
-            )}
+              {flow && flow.labels.length > 0 && (
+                <div className="flex flex-col items-stretch gap-0.5 mt-1 max-w-[200px]">
+                  {flow.labels.slice(0, 4).map((l, i) => (
+                    <FlowChip key={i} label={l} />
+                  ))}
+                  {flow.labels.length > 4 && (
+                    <div className="text-[8px] opacity-40 font-mono text-center">+{flow.labels.length - 4}</div>
+                  )}
+                  {flow.responseLabel && (
+                    <div className="text-[8px] font-mono text-green-700 truncate" title={flow.responseLabel}>
+                      ↑ {flow.responseLabel}
+                    </div>
+                  )}
+                </div>
+              )}
 
-            {!flow && hasDetails && (
-               <div className="text-[8px] opacity-40 font-mono">
+              {!flow && hasDetails && (
+                <div className="text-[8px] opacity-40 font-mono">
                   {mappings.length > 0 ? `${mappings.length} MAPPINGS` : `${endpoints.length} CALLS`}
-               </div>
-            )}
+                </div>
+              )}
 
-            {/* Hover Tooltip Mini */}
-            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover:block z-50">
-               <div className="bg-brand-ink text-white p-2 text-[8px] font-mono whitespace-nowrap border border-white/20 shadow-xl">
+              {/* Hover Tooltip Mini */}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover:block z-50">
+                <div className="bg-brand-ink text-white p-2 text-[8px] font-mono whitespace-nowrap border border-white/20 shadow-xl">
                   {mappings.slice(0, 3).map((m: any, i: number) => (
                     <div key={i} className="mb-1 last:mb-0">
-                       <span className="opacity-50">{m.method}</span> {m.backend_endpoint}
+                      <span className="opacity-50">{m.method}</span> {m.backend_endpoint}
                     </div>
                   ))}
                   {endpoints.slice(0, 3).map((e: any, i: number) => {
@@ -117,17 +120,18 @@ export const CustomEdge = ({
                     const path = isString ? parts!.slice(1).join(' ') : e.path;
                     return (
                       <div key={i} className="mb-1 last:mb-0">
-                         <span className="opacity-50">{method}</span> {path}
+                        <span className="opacity-50">{method}</span> {path}
                       </div>
                     );
                   })}
                   {(mappings.length > 3 || endpoints.length > 3) && (
                     <div className="opacity-30">...and {Math.max(mappings.length, endpoints.length) - 3} more</div>
                   )}
-               </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </EdgeLabelRenderer>
     </>
   );
