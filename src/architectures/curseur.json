@@ -1,0 +1,1081 @@
+{
+  "architecture": "Bo Flow Distribution",
+  "type": "FULLSTACK",
+  "version": "0.1.0",
+  "lastUpdated": "2026-05-21",
+  "description": "- node >16 - yarn 3.2.1",
+  "layers": [
+    {
+      "name": "Frontend",
+      "color": "#E3F2FD",
+      "description": "Couche présentation — interfaces utilisateur, SPA, MFE"
+    },
+    {
+      "name": "Backend",
+      "color": "#FFF3E0",
+      "description": "Couche métier — API REST, services, traitements"
+    },
+    {
+      "name": "Data",
+      "color": "#F3E5F5",
+      "description": "Couche persistance — bases de données, cache, files"
+    },
+    {
+      "name": "External",
+      "color": "#E8F5E9",
+      "description": "Services externes / tiers — APIs partenaires, IAM, monitoring"
+    }
+  ],
+  "components": [
+    {
+      "id": "backend_flow_distribution_api",
+      "label": "Flow Distribution API",
+      "type": "backend",
+      "layer": "Backend",
+      "technology": "Java 25 + Spring Boot 4.0.1 + Jersey 4.0.0 + OpenFeign",
+      "url": "${API_URL}",
+      "port": 8080,
+      "authentication": {
+        "type": "JWT + habilitations CAS",
+        "provider": "Arkéa IAM",
+        "token_format": "Authentication: <JWT>",
+        "token_expiry": "À confirmer",
+        "roles_permissions": "JWT requis ; certaines routes exigent l'habilitation PACMAN:130",
+        "note": "Les contrôleurs annotés @CasHabilitations imposent PACMAN:130 ; /api/v1/check reste public."
+      },
+      "endpoints": [
+        {
+          "path": "/api/v1/check",
+          "method": "GET",
+          "description": "Vérifie la disponibilité technique du service.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200
+          ],
+          "validation": "✅ VALID"
+        },
+        {
+          "path": "/api/v1/scores",
+          "method": "GET",
+          "description": "Liste les scores pivot utilisés pour déterminer le statut premium.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": [
+              "authentication"
+            ]
+          },
+          "response_schema": "Score[]",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_SEGMENTATION",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/scores",
+          "method": "POST",
+          "description": "Crée de nouveaux scores pivot pour les canaux voix et e-mail.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "scores"
+            ],
+            "headers": [
+              "authentication",
+              "Content-Type"
+            ]
+          },
+          "response_schema": "Score[]",
+          "status_codes": [
+            201,
+            400,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_SEGMENTATION",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_SEGMENTATION",
+              "operation": "SELECT",
+              "note": "Relit les derniers scores après insertion."
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/outsourcers-distribution",
+          "method": "GET",
+          "description": "Retourne la distribution courante des flux vers les prestataires pour chaque produit.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": [
+              "authentication"
+            ]
+          },
+          "response_schema": "DispatchPercent[]",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_ALLOCATION",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/premium-status/{accessCode}",
+          "method": "GET",
+          "description": "Calcule le statut premium voix et e-mail d'un client à partir de sa segmentation CRM et des scores courants.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "accessCode"
+            ],
+            "body": [],
+            "headers": [
+              "authentication"
+            ]
+          },
+          "response_schema": "PremiumStatus",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "service_isi_crm",
+              "resource": "/isicrm/api/personnes/segmentation/code-acces/{codeAcces}",
+              "operation": "GET"
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_SEGMENTATION",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/app-params",
+          "method": "GET",
+          "description": "Retourne les paramètres applicatifs de référence, notamment produits et prestataires.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": [
+              "authentication"
+            ]
+          },
+          "response_schema": "AppParams",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID"
+        },
+        {
+          "path": "/api/v1/app-warnings",
+          "method": "GET",
+          "description": "Retourne les avertissements applicatifs, par exemple les modifications récentes.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": [
+              "authentication"
+            ]
+          },
+          "response_schema": "Warning[]",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID"
+        },
+        {
+          "path": "/api/v1/allocation/{id}",
+          "method": "GET",
+          "description": "Liste les allocations rattachées à une répartition donnée.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "id"
+            ],
+            "body": [],
+            "headers": [
+              "authentication"
+            ]
+          },
+          "response_schema": "Allocation[]",
+          "status_codes": [
+            200,
+            401,
+            403,
+            404,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_ALLOCATION",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/planning",
+          "method": "GET",
+          "description": "Construit les données de planning hebdomadaire à partir des répartitions et de leurs récurrences.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "weekNumber",
+              "year",
+              "product"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "authentication"
+            ]
+          },
+          "response_schema": "PlanningData",
+          "status_codes": [
+            200,
+            400,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_RECURRENCE",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/report-file",
+          "method": "POST",
+          "description": "Dépose un fichier CSV de reporting dans le web store distant puis nettoie les anciennes versions.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "file"
+            ],
+            "headers": [
+              "authentication",
+              "Content-Type"
+            ]
+          },
+          "response_schema": "Void",
+          "status_codes": [
+            201,
+            400,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "service_web_store",
+              "resource": "/{fileName}",
+              "operation": "PUT"
+            },
+            {
+              "component_id": "service_web_store",
+              "resource": "/Version_PAC_Reporting_version.txt",
+              "operation": "PUT"
+            },
+            {
+              "component_id": "service_web_store",
+              "resource": "/{currentFileName}",
+              "operation": "DELETE",
+              "note": "Nettoyage des anciennes versions après upload."
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/repartition",
+          "method": "POST",
+          "description": "Crée une nouvelle répartition et ses allocations associées.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "repartitionDto"
+            ],
+            "headers": [
+              "authentication"
+            ]
+          },
+          "response_schema": "RepartitionDto",
+          "status_codes": [
+            200,
+            400,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "UPDATE",
+              "note": "Ferme l'ancienne répartition par défaut si le type créé est DEFAULT."
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_RECURRENCE",
+              "operation": "SELECT",
+              "note": "Résolution de l'identifiant de récurrence pour les répartitions REC."
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_ALLOCATION",
+              "operation": "INSERT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/repartition/replace",
+          "method": "POST",
+          "description": "Remplace une répartition existante en la supprimant ou en l'interrompant puis en recréant allocations et configuration.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "repartitionDto"
+            ],
+            "headers": [
+              "authentication"
+            ]
+          },
+          "response_schema": "RepartitionDto",
+          "status_codes": [
+            200,
+            400,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "DELETE",
+              "note": "Suppression si la répartition remplacée n'a pas encore démarré."
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "UPDATE",
+              "note": "Interruption de la répartition existante si elle est déjà active."
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_ALLOCATION",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_ALLOCATION",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_RECURRENCE",
+              "operation": "SELECT",
+              "note": "Utilisé pour les répartitions de type REC."
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/repartition",
+          "method": "GET",
+          "description": "Retourne le détail d'une répartition identifiée par son id, avec ses allocations.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "idRepartition"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "authentication"
+            ]
+          },
+          "response_schema": "RepartitionDto",
+          "status_codes": [
+            200,
+            400,
+            401,
+            403,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_ALLOCATION",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/repartition/interruption",
+          "method": "PATCH",
+          "description": "Interrompt une répartition active à la date courante rétrodatée de quelques secondes.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "idRepartition"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "authentication"
+            ]
+          },
+          "response_schema": "Void",
+          "status_codes": [
+            200,
+            400,
+            401,
+            403,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "UPDATE"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/repartition",
+          "method": "DELETE",
+          "description": "Supprime une répartition future ainsi que ses allocations.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "idRepartition"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "authentication"
+            ]
+          },
+          "response_schema": "Void",
+          "status_codes": [
+            200,
+            400,
+            401,
+            403,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_ALLOCATION",
+              "operation": "DELETE"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/repartitions",
+          "method": "GET",
+          "description": "Liste les répartitions visibles pour une date et un produit donnés.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "date",
+              "product"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "authentication"
+            ]
+          },
+          "response_schema": "Repartition[]",
+          "status_codes": [
+            200,
+            400,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/repartition/active",
+          "method": "GET",
+          "description": "Retourne la répartition actuellement active pour une date et un produit donnés.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "date",
+              "product"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "authentication"
+            ]
+          },
+          "response_schema": "Repartition",
+          "status_codes": [
+            200,
+            400,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/repartition/history",
+          "method": "GET",
+          "description": "Recherche l'historique des répartitions terminées ou interrompues selon plusieurs filtres.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "type",
+              "text",
+              "startDate",
+              "endDate",
+              "product"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "authentication"
+            ]
+          },
+          "response_schema": "Repartition[]",
+          "status_codes": [
+            200,
+            400,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_mysql_flow_distribution",
+              "resource": "T38_REPARTITION",
+              "operation": "SELECT"
+            }
+          ]
+        }
+      ],
+      "deployment": {
+        "containerized": true,
+        "platform": "Docker",
+        "ci_cd": "GitLab CI"
+      }
+    },
+    {
+      "id": "db_mysql_flow_distribution",
+      "label": "MySQL Flow Distribution",
+      "type": "db",
+      "layer": "Data",
+      "technology": "MySQL 8.0.33",
+      "url": "${cloud_mysql_database_flow_distri_url}",
+      "port": 3306,
+      "consumed_via": "Spring JDBC + NamedParameterJdbcTemplate",
+      "tables": [
+        {
+          "name": "T38_SEGMENTATION",
+          "purpose": "Historise les scores pivot utilisés pour déterminer le statut premium."
+        },
+        {
+          "name": "T38_REPARTITION",
+          "purpose": "Stocke les répartitions de flux planifiées, temporaires, récurrentes ou par défaut."
+        },
+        {
+          "name": "T38_RECURRENCE",
+          "purpose": "Porte les jours d'activation des répartitions récurrentes."
+        },
+        {
+          "name": "T38_ALLOCATION",
+          "purpose": "Associe une répartition à ses allocations par canal, prestataire et type de personne."
+        }
+      ]
+    },
+    {
+      "id": "service_isi_crm",
+      "label": "ISI CRM API",
+      "type": "service",
+      "layer": "External",
+      "technology": "REST API (OpenFeign + OkHttp + Jackson)",
+      "url": "${cloud_isicrmapi_url}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/isicrm/api/personnes/segmentation/code-acces/{codeAcces}",
+          "method": "GET"
+        }
+      ],
+      "used_by": [
+        "backend_flow_distribution_api"
+      ]
+    },
+    {
+      "id": "service_web_store",
+      "label": "Web Store",
+      "type": "service",
+      "layer": "External",
+      "technology": "WebDAV (Sardine 5.13)",
+      "url": "${cloud_webstore_url}${cloud_webstore_path_csv_flow_distri}",
+      "consumed_via": "Sardine WebDAV client",
+      "endpoints": [
+        {
+          "path": "/{fileName}",
+          "method": "PUT"
+        },
+        {
+          "path": "/Version_PAC_Reporting_version.txt",
+          "method": "PUT"
+        },
+        {
+          "path": "/{fileName}",
+          "method": "DELETE"
+        }
+      ],
+      "used_by": [
+        "backend_flow_distribution_api"
+      ]
+    },
+    {
+      "id": "bo_flow_distribution",
+      "label": "Bo Flow Distribution",
+      "type": "frontend",
+      "layer": "Frontend",
+      "technology": "React 19.0.0 + Vite 5.0.11 + @mui/material 6.4.8",
+      "url": "À confirmer",
+      "build_tool": "Vite 5.0.11",
+      "state_management": "@tanstack/react-query 5.60.6 (server-state) + zustand 5.0.1 (client-state)",
+      "key_dependencies": [
+        "axios 1.7.9",
+        "@fortuneo/fto-bo-security-lib 1.0.15",
+        "@fortuneo/ui 2.6.0"
+      ],
+      "routes": [
+        {
+          "path": "/flow-distribution",
+          "label": "Point d'entrée",
+          "authenticated": true,
+          "description": "Route d’entrée qui charge les paramètres applicatifs, vérifie l’habilitation puis redirige vers l’espace de gestion ou la page non autorisée.",
+          "api_calls": [
+            "GET /app-params"
+          ]
+        },
+        {
+          "path": "/flow-distribution/unauthorized",
+          "label": "Accès non autorisé",
+          "authenticated": false,
+          "description": "Page d’information affichée lorsque l’utilisateur n’est pas habilité à accéder à l’interface.",
+          "api_calls": []
+        },
+        {
+          "path": "/flow-distribution/repartitions",
+          "label": "Répartitions",
+          "authenticated": true,
+          "description": "Écran principal de consultation et pilotage des répartitions avec vues tableau et agenda, historique, interruption, suppression et ouverture du détail.",
+          "api_calls": [
+            "GET /repartitions?product={product}&date={date}",
+            "GET /repartition/active?date={date}&product={product}",
+            "GET /repartition/history?product={product}&startDate={startDate}&endDate={endDate}&text={text}&type={type}",
+            "GET /planning?weekNumber={weekNumber}&year={year}&product={product}",
+            "GET /allocation/{id}",
+            "PATCH /repartition/interruption?idRepartition={id}",
+            "DELETE /repartition?idRepartition={id}"
+          ]
+        },
+        {
+          "path": "/flow-distribution/create",
+          "label": "Créer une répartition",
+          "authenticated": true,
+          "description": "Formulaire de création ou duplication d’une répartition avec paramétrage des dates, canaux, populations et prestataires.",
+          "api_calls": [
+            "POST /repartition"
+          ]
+        },
+        {
+          "path": "/flow-distribution/replace",
+          "label": "Remplacer une répartition",
+          "authenticated": true,
+          "description": "Formulaire de modification d’une répartition existante via un parcours de remplacement.",
+          "api_calls": [
+            "POST /repartition/replace"
+          ]
+        },
+        {
+          "path": "/flow-distribution/score",
+          "label": "Curseurs Smart / Premium",
+          "authenticated": true,
+          "description": "Écran de consultation des curseurs Smart/Premium courants et de leur historique.",
+          "api_calls": [
+            "GET /scores"
+          ]
+        },
+        {
+          "path": "/flow-distribution/score/update",
+          "label": "Modifier les curseurs",
+          "authenticated": true,
+          "description": "Écran d’édition des curseurs d’appel et d’email avec validation et enregistrement.",
+          "api_calls": [
+            "GET /scores",
+            "POST /scores"
+          ]
+        },
+        {
+          "path": "/flow-distribution/forecast",
+          "label": "Import des prévisions",
+          "authenticated": true,
+          "description": "Écran d’import CSV des prévisions avec contrôles de format et de taille avant envoi au backend.",
+          "api_calls": [
+            "POST /report-file"
+          ]
+        },
+        {
+          "path": "/flow-distribution/read",
+          "label": "Lire une répartition",
+          "authenticated": true,
+          "description": "Vue détaillée en lecture seule d’une répartition sélectionnée depuis le planning ou l’historique.",
+          "api_calls": [
+            "GET /repartition?idRepartition={id}"
+          ]
+        }
+      ],
+      "deployment": {
+        "ci_cd": "GitLab CI"
+      },
+      "description": "Interface back-office de distribution des flux permettant de consulter le planning et l’historique des répartitions, créer ou remplacer des répartitions, ajuster les curseurs Smart/Premium et importer des prévisions CSV."
+    }
+  ],
+  "connections": [
+    {
+      "id": "backend_flow_distribution_api_to_service_isi_crm",
+      "from": "backend_flow_distribution_api",
+      "to": "service_isi_crm",
+      "protocol": "REST/HTTPS",
+      "authenticated": true
+    },
+    {
+      "id": "backend_flow_distribution_api_to_service_web_store",
+      "from": "backend_flow_distribution_api",
+      "to": "service_web_store",
+      "protocol": "REST/HTTPS",
+      "authenticated": true
+    },
+    {
+      "id": "bo_flow_distribution_to_backend_flow_distribution_api",
+      "from": "bo_flow_distribution",
+      "to": "backend_flow_distribution_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Appels synchrones de l'interface React vers l'API de gestion des répartitions et curseurs.",
+      "client": "axios",
+      "flow": "Browser → JWT/habilitations → API Flow Distribution → réponse JSON",
+      "endpoint_mappings": [
+        {
+          "frontend_endpoint": "GET /app-params",
+          "backend_endpoint": "/api/v1/app-params",
+          "method": "GET",
+          "frontend_pages": [
+            "/flow-distribution",
+            "/flow-distribution/create",
+            "/flow-distribution/replace"
+          ],
+          "purpose": "Charger les paramètres applicatifs nécessaires aux écrans.",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /app-warnings",
+          "backend_endpoint": "/api/v1/app-warnings",
+          "method": "GET",
+          "frontend_pages": [
+            "/flow-distribution",
+            "/flow-distribution/repartitions",
+            "/flow-distribution/create",
+            "/flow-distribution/read",
+            "/flow-distribution/replace",
+            "/flow-distribution/score",
+            "/flow-distribution/score/update",
+            "/flow-distribution/forecast"
+          ],
+          "purpose": "Récupérer les avertissements applicatifs affichés dans l'interface.",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /repartitions",
+          "backend_endpoint": "/api/v1/repartitions",
+          "method": "GET",
+          "frontend_pages": [
+            "/flow-distribution/repartitions"
+          ],
+          "purpose": "Lister les répartitions visibles pour la date et le produit sélectionnés.",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /repartition/active",
+          "backend_endpoint": "/api/v1/repartition/active",
+          "method": "GET",
+          "frontend_pages": [
+            "/flow-distribution/repartitions"
+          ],
+          "purpose": "Afficher la répartition active courante.",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /repartition/history",
+          "backend_endpoint": "/api/v1/repartition/history",
+          "method": "GET",
+          "frontend_pages": [
+            "/flow-distribution/repartitions"
+          ],
+          "purpose": "Consulter l'historique filtré des répartitions.",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /planning",
+          "backend_endpoint": "/api/v1/planning",
+          "method": "GET",
+          "frontend_pages": [
+            "/flow-distribution/repartitions"
+          ],
+          "purpose": "Alimenter la vue agenda hebdomadaire.",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /allocation/{id}",
+          "backend_endpoint": "/api/v1/allocation/{id}",
+          "method": "GET",
+          "frontend_pages": [
+            "/flow-distribution/repartitions"
+          ],
+          "purpose": "Charger le détail des allocations d'une répartition.",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "PATCH /repartition/interruption",
+          "backend_endpoint": "/api/v1/repartition/interruption",
+          "method": "PATCH",
+          "frontend_pages": [
+            "/flow-distribution/repartitions"
+          ],
+          "purpose": "Interrompre une répartition active depuis l'écran principal.",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "DELETE /repartition",
+          "backend_endpoint": "/api/v1/repartition",
+          "method": "DELETE",
+          "frontend_pages": [
+            "/flow-distribution/repartitions"
+          ],
+          "purpose": "Supprimer une répartition future.",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "POST /repartition",
+          "backend_endpoint": "/api/v1/repartition",
+          "method": "POST",
+          "frontend_pages": [
+            "/flow-distribution/create"
+          ],
+          "purpose": "Créer une nouvelle répartition depuis le formulaire.",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /repartition",
+          "backend_endpoint": "/api/v1/repartition",
+          "method": "GET",
+          "frontend_pages": [
+            "/flow-distribution/read"
+          ],
+          "purpose": "Lire le détail d'une répartition existante.",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "POST /repartition/replace",
+          "backend_endpoint": "/api/v1/repartition/replace",
+          "method": "POST",
+          "frontend_pages": [
+            "/flow-distribution/replace"
+          ],
+          "purpose": "Remplacer une répartition existante.",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /scores",
+          "backend_endpoint": "/api/v1/scores",
+          "method": "GET",
+          "frontend_pages": [
+            "/flow-distribution/score",
+            "/flow-distribution/score/update"
+          ],
+          "purpose": "Consulter les valeurs pivot et leur historique.",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "POST /scores",
+          "backend_endpoint": "/api/v1/scores",
+          "method": "POST",
+          "frontend_pages": [
+            "/flow-distribution/score/update"
+          ],
+          "purpose": "Enregistrer de nouvelles valeurs pivot.",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "POST /report-file",
+          "backend_endpoint": "/api/v1/report-file",
+          "method": "POST",
+          "frontend_pages": [
+            "/flow-distribution/forecast"
+          ],
+          "purpose": "Téléverser le fichier CSV de prévisions.",
+          "status": "✅ MAPPÉ"
+        }
+      ]
+    },
+    {
+      "id": "backend_flow_distribution_api_to_db_mysql_flow_distribution",
+      "from": "backend_flow_distribution_api",
+      "to": "db_mysql_flow_distribution",
+      "protocol": "JDBC",
+      "authenticated": false,
+      "description": "Accès SQL de l'API aux tables de répartition, segmentation, allocations et récurrences.",
+      "client": "JdbcTemplate + NamedParameterJdbcTemplate",
+      "flow": "API backend → requêtes SQL → base MySQL"
+    }
+  ]
+}

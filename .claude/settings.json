@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Set-Location 'C:\\\\Users\\\\Dylan\\\\Downloads\\\\architectviz\\\\mcp-server'; npx tsc --noEmit; \"mcp tsc exit: $LASTEXITCODE\")",
+      "PowerShell(Set-Location 'C:\\\\Users\\\\Dylan\\\\Downloads\\\\architectviz'; npx tsc --noEmit; \"app tsc exit: $LASTEXITCODE\")",
+      "PowerShell(Set-Location 'C:\\\\Users\\\\Dylan\\\\Downloads\\\\architectviz'; npm run build 2>&1 | Select-String -Pattern \"built in|error TS|Error:\" | Select-Object -Last 4; \"app build exit: $LASTEXITCODE\")",
+      "PowerShell(Set-Location 'C:\\\\Users\\\\Dylan\\\\Downloads\\\\architectviz\\\\mcp-server'; npm run build 2>&1 | Select-String -Pattern \"error TS|Error:|sync-core\" | Select-Object -Last 8; \"mcp build exit: $LASTEXITCODE\")",
+      "Bash(cat)",
+      "Bash(node /tmp/smoke.mjs)",
+      "Bash(cd /c/Users/Dylan/Downloads/architectviz/mcp-server; *)",
+      "PowerShell(Set-Location 'C:\\\\Users\\\\Dylan\\\\Downloads\\\\architectviz\\\\mcp-server'; npm run build 2>&1 | Select-String -Pattern \"error TS|sync-core\" | Select-Object -Last 4; \"mcp build exit: $LASTEXITCODE\")",
+      "Bash(node /tmp/checkmock.mjs)",
+      "PowerShell(Set-Location 'C:\\\\Users\\\\Dylan\\\\Downloads\\\\architectviz'; npx tsc --noEmit; \"tsc: $LASTEXITCODE\"; npm run build 2>&1 | Select-String -Pattern \"built in|error TS\" | Select-Object -Last 3; \"build: $LASTEXITCODE\")",
+      "PowerShell(Set-Location 'C:\\\\Users\\\\Dylan\\\\Downloads\\\\architectviz'; npx tsc --noEmit; \"tsc: $LASTEXITCODE\")",
+      "PowerShell(Set-Location 'C:\\\\Users\\\\Dylan\\\\Downloads\\\\architectviz\\\\mcp-server'; npm run build 2>&1 | Select-String -Pattern \"error TS|sync-core\" | Select-Object -Last 3; \"mcp build: $LASTEXITCODE\")",
+      "PowerShell(Set-Location 'C:\\\\Users\\\\Dylan\\\\Downloads\\\\architectviz\\\\mcp-server'; npm run build 2>&1 | Select-String -Pattern \"error TS\" | Select-Object -Last 3; \"mcp: $LASTEXITCODE\")",
+      "Bash(node /tmp/flow.mjs)",
+      "PowerShell(Set-Location 'C:\\\\Users\\\\Dylan\\\\Downloads\\\\architectviz'; npm run build 2>&1 | Select-String -Pattern \"built in|error TS\" | Select-Object -Last 3; \"build: $LASTEXITCODE\")"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}

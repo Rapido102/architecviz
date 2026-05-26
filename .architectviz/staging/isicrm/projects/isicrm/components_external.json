@@ -1,0 +1,547 @@
+[
+  {
+    "id": "crm_api",
+    "label": "CRM Custom REST API",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+    "url": "${CRM_URL}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/edealCRM/customrestapi/personne",
+        "method": "POST",
+        "description": "Crée ou met à jour une personne côté CRM Merlin/Edeal."
+      },
+      {
+        "path": "/edealCRM/customrestapi/personne/idCRM/{idCRM}",
+        "method": "GET",
+        "description": "Retourne une personne CRM à partir de son identifiant CRM."
+      },
+      {
+        "path": "/edealCRM/customrestapi/demandes",
+        "method": "POST",
+        "description": "Crée une demande CRM côté Merlin/Edeal."
+      },
+      {
+        "path": "/edealCRM/customrestapi/demandes/{idDemande}",
+        "method": "GET",
+        "description": "Retourne une demande CRM à partir de son identifiant technique."
+      },
+      {
+        "path": "/edealCRM/customrestapi/opportunites",
+        "method": "POST",
+        "description": "Crée ou fusionne une opportunité commerciale côté CRM."
+      },
+      {
+        "path": "/edealCRM/customrestapi/interactions/{idInteraction}/message",
+        "method": "GET",
+        "description": "Retourne le message détaillé associé à une interaction CRM."
+      },
+      {
+        "path": "/edealCRM/customrestapi/codepromotion/{codepromo}",
+        "method": "GET",
+        "description": "Vérifie l’existence d’un code promotionnel dans le CRM."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "API REST Merlin/Edeal consommée par ISI-CRM pour créer, lire et enrichir personnes, demandes, opportunités, interactions et codes promotionnels côté CRM."
+  },
+  {
+    "id": "dms_api",
+    "label": "DMS API",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+    "url": "${DMS_URL}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/api/v1/impression",
+        "method": "POST",
+        "description": "Déclenche une demande d’impression automatique dans le système documentaire."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "Service documentaire utilisé pour déclencher des impressions automatiques et déposer des demandes d’édition vers le système documentaire."
+  },
+  {
+    "id": "nba_api",
+    "label": "Next Best Action API",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+    "url": "${NBA_URL}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/api/v1/actions",
+        "method": "GET",
+        "description": "Retourne les Next Best Actions disponibles pour le contexte métier."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "Service de recommandations métiers exposant des Next Best Actions consommées par ISI-CRM pour la vision conseiller."
+  },
+  {
+    "id": "flowdistribution_api",
+    "label": "Flow Distribution API",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+    "url": "${FLOWDISTRIBUTION_URL}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/api/v1/scores",
+        "method": "GET",
+        "description": "Retourne des scores de distribution ou de priorisation de flux."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "Service de scoring et de distribution de flux utilisé pour orienter ou prioriser certains parcours métier."
+  },
+  {
+    "id": "sponsorship_api",
+    "label": "Sponsorship API",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+    "url": "${SPONSORSHIP_URL}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/api/v1/sponsor/private/info",
+        "method": "GET",
+        "description": "Retourne les informations de parrainage liées à un client."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "Service de parrainage consulté pour récupérer les informations sponsor/filleul liées aux parcours client."
+  },
+  {
+    "id": "vault_api",
+    "label": "Vault API",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+    "url": "${VAULT_URL}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/vault/v2/app_get_key",
+        "method": "POST",
+        "description": "Récupère une clé ou un secret applicatif depuis le coffre-fort."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "Coffre de secrets appelé par ISI-CRM pour récupérer des clés ou secrets techniques nécessaires aux intégrations sortantes."
+  },
+  {
+    "id": "client_api",
+    "label": "Client API",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+    "url": "${CLIENTAPI_URL}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/private/persons/{numeroPersonne}/purge/status",
+        "method": "PATCH",
+        "description": "Met à jour le statut de purge d’une personne côté API client."
+      },
+      {
+        "path": "/private/persons/{numeroPersonnecrypte}/certifications",
+        "method": "GET",
+        "description": "Retourne les informations de certification KYC d’une personne."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "API client transverse utilisée pour consulter des certifications KYC et notifier certains statuts comme la purge."
+  },
+  {
+    "id": "security_api",
+    "label": "Security API",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+    "url": "${SECURITY_URL}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/security-api/enrollment/devices",
+        "method": "POST",
+        "description": "Retourne ou recherche les devices enrôlés pour l’authentification forte."
+      },
+      {
+        "path": "/security-api/pending-operations/{idOperation}/status",
+        "method": "GET",
+        "description": "Retourne le statut d’une opération d’authentification forte."
+      },
+      {
+        "path": "/security-api/operation",
+        "method": "POST",
+        "description": "Crée ou prépare une opération d’authentification forte."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "API de sécurité forte utilisée pour gérer les devices enrôlés, créer des opérations d’authentification et consulter leur statut."
+  },
+  {
+    "id": "security_proxy_api",
+    "label": "Security Proxy API",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+    "url": "${SECURITY_PROXY_URL}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/oauth",
+        "method": "POST",
+        "description": "Délivre un jeton OAuth technique pour les appels sécurisés suivants."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "Proxy OAuth utilisé pour obtenir les jetons techniques nécessaires avant d’appeler certaines APIs sécurisées du SI."
+  },
+  {
+    "id": "gesparam_api",
+    "label": "Gesparam Services API",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+    "url": "${GESPARAMSERVICES_URL}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/gesparamservices/api/v1/tables/T38SAM0?CD_EFS=21",
+        "method": "GET",
+        "description": "Retourne la table de paramétrage métier T38SAM0."
+      },
+      {
+        "path": "/gesparamservices/api/v1/tables/T38SDCQ?CD_EFS=21",
+        "method": "GET",
+        "description": "Retourne la table de paramétrage T38SDCQ utilisée pour les qualifications."
+      },
+      {
+        "path": "/gesparamservices/api/v1/tables/T38SDCT?CD_EFS=21",
+        "method": "GET",
+        "description": "Retourne la table de paramétrage T38SDCT utilisée pour les statuts et transcodages."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "Service de paramètres métiers exposant les tables de référence et de transcodification mises ensuite en cache par ISI-CRM."
+  },
+  {
+    "id": "cashback_api",
+    "label": "Cashback API",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+    "url": "${CASHBACKAPI_URL}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/users/{personNumber}/context",
+        "method": "GET",
+        "description": "Retourne le contexte cashback d’un client."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "Service cashback consulté pour récupérer le contexte et les informations de cashback d’un client."
+  },
+  {
+    "id": "investorprofile_api",
+    "label": "Investor Profile API",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+    "url": "${INVESTORPROFILEAPI_URL}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/investor-profiles",
+        "method": "GET",
+        "description": "Retourne le profil investisseur d’un client."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "API de profil investisseur utilisée notamment dans les parcours d’épargne/PER pour récupérer les informations de profilage."
+  },
+  {
+    "id": "lifeinsurance_api",
+    "label": "Life Insurance API",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+    "url": "${LIFEINSURANCEAPI_URL}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/accounts/{accountId}",
+        "method": "GET",
+        "description": "Retourne le détail d’un compte d’assurance-vie ou PER."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "API assurance vie consultée pour enrichir les détails de comptes et contrats de type PER/assurance vie."
+  },
+  {
+    "id": "account_api",
+    "label": "Account API",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+    "url": "${ACCOUNTAPI_URL}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/accounts",
+        "method": "GET",
+        "description": "Retourne des informations consolidées sur les comptes."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "API de comptes transverse utilisée pour consulter des informations consolidées sur les comptes bancaires."
+  },
+  {
+    "id": "webstore_service",
+    "label": "WebStore",
+    "type": "service",
+    "layer": "External",
+    "technology": "HTTP file service via proxy servlet",
+    "url": "${WEBSTORE_URL}",
+    "consumed_via": "ProxyServlet",
+    "endpoints": [
+      {
+        "path": "/fortuneo/FormPJ/",
+        "method": "GET",
+        "description": "Accède aux documents et pièces jointes stockés dans le WebStore."
+      },
+      {
+        "path": "/fortuneo/MERLIN",
+        "method": "GET",
+        "description": "Accède à l’espace Merlin du WebStore."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "Service HTTP de fichiers et de pièces jointes utilisé pour accéder à des documents ou ressources stockées côté WebStore."
+  },
+  {
+    "id": "panier_thrift",
+    "label": "Panier Thrift Services",
+    "type": "service",
+    "layer": "External",
+    "technology": "Apache Thrift (binary over HTTP)",
+    "url": "${DAO_THRIFT_PANIER_BASE}",
+    "consumed_via": "fortuneo-thrift-client",
+    "endpoints": [
+      {
+        "path": "/personne",
+        "method": "POST",
+        "description": "Point d’entrée Thrift pour les données personne."
+      },
+      {
+        "path": "/compte",
+        "method": "POST",
+        "description": "Point d’entrée Thrift pour les données de compte."
+      },
+      {
+        "path": "/adresse",
+        "method": "POST",
+        "description": "Point d’entrée Thrift pour les données d’adresse."
+      },
+      {
+        "path": "/crm",
+        "method": "POST",
+        "description": "Point d’entrée Thrift pour les opérations CRM legacy."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "Services Thrift legacy centrés sur les données client, compte, adresse et CRM, utilisés comme sources cœur de gestion Fortuneo."
+  },
+  {
+    "id": "backend_thrift",
+    "label": "Backend Thrift Services",
+    "type": "service",
+    "layer": "External",
+    "technology": "Apache Thrift (binary over HTTP)",
+    "url": "${DAO_THRIFT_BACKEND_BASE}",
+    "consumed_via": "fortuneo-thrift-client",
+    "endpoints": [
+      {
+        "path": "/personne",
+        "method": "POST",
+        "description": "Point d’entrée backend Thrift pour les données personne."
+      },
+      {
+        "path": "/compte",
+        "method": "POST",
+        "description": "Point d’entrée backend Thrift pour les données de compte."
+      },
+      {
+        "path": "/operation",
+        "method": "POST",
+        "description": "Point d’entrée backend Thrift pour les opérations bancaires."
+      },
+      {
+        "path": "/portefeuille",
+        "method": "POST",
+        "description": "Point d’entrée backend Thrift pour les données de portefeuille."
+      },
+      {
+        "path": "/assurancevie",
+        "method": "POST",
+        "description": "Point d’entrée backend Thrift pour les contrats d’assurance-vie."
+      },
+      {
+        "path": "/pdf",
+        "method": "POST",
+        "description": "Génère ou récupère des documents PDF via le backend Thrift."
+      },
+      {
+        "path": "/securiteforte",
+        "method": "POST",
+        "description": "Expose des fonctions de sécurité forte via Thrift."
+      },
+      {
+        "path": "/segmentationSP",
+        "method": "POST",
+        "description": "Retourne ou calcule la segmentation SP via Thrift."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "Services Thrift backend fournissant opérations, portefeuille, PDF, sécurité forte et autres fonctions cœur de gestion non exposées en REST."
+  },
+  {
+    "id": "pacman_thrift",
+    "label": "Pacman Thrift Services",
+    "type": "service",
+    "layer": "External",
+    "technology": "Apache Thrift (binary over HTTP)",
+    "url": "${DAO_THRIFT_PACMAN_BASE}",
+    "consumed_via": "fortuneo-thrift-client",
+    "endpoints": [
+      {
+        "path": "/operation",
+        "method": "POST",
+        "description": "Point d’entrée Pacman pour l’historique et les opérations."
+      },
+      {
+        "path": "/carte",
+        "method": "POST",
+        "description": "Point d’entrée Pacman pour les données cartes."
+      },
+      {
+        "path": "/compte",
+        "method": "POST",
+        "description": "Point d’entrée Pacman pour les données comptes."
+      },
+      {
+        "path": "/contrat",
+        "method": "POST",
+        "description": "Point d’entrée Pacman pour les contrats."
+      },
+      {
+        "path": "/livret",
+        "method": "POST",
+        "description": "Point d’entrée Pacman pour les livrets."
+      },
+      {
+        "path": "/gestioncreditimmo",
+        "method": "POST",
+        "description": "Point d’entrée Pacman pour la gestion du crédit immobilier."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "Services Thrift spécialisés sur opérations, cartes, comptes, contrats, livrets et crédits immobiliers."
+  },
+  {
+    "id": "souscriptionback_thrift",
+    "label": "Souscription Back Thrift Services",
+    "type": "service",
+    "layer": "External",
+    "technology": "Apache Thrift (binary over HTTP)",
+    "url": "${DAO_THRIFT_SOUSBACK_BASE}",
+    "consumed_via": "fortuneo-thrift-client",
+    "endpoints": [
+      {
+        "path": "/souscriptionimmo",
+        "method": "POST",
+        "description": "Expose les traitements de souscription immobilière."
+      },
+      {
+        "path": "/souscripteur",
+        "method": "POST",
+        "description": "Expose les informations de souscripteur côté back-office."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "Services Thrift de back-office de souscription utilisés pour les dossiers immo et les informations souscripteur."
+  },
+  {
+    "id": "custkn_thrift",
+    "label": "Custkn Thrift Services",
+    "type": "service",
+    "layer": "External",
+    "technology": "Apache Thrift (binary over HTTP)",
+    "url": "${DAO_THRIFT_CUSTKN_BASE}",
+    "consumed_via": "fortuneo-thrift-client",
+    "endpoints": [
+      {
+        "path": "/thrift/infosclient/",
+        "method": "POST",
+        "description": "Expose les informations client via le service CustKN."
+      },
+      {
+        "path": "/thrift/profilinvestisseur/",
+        "method": "POST",
+        "description": "Expose le profil investisseur via le service CustKN."
+      }
+    ],
+    "used_by": [
+      "isicrm_backend"
+    ],
+    "description": "Services Thrift liés aux informations client et au profil investisseur, utilisés dans les parcours de connaissance client et plafonds."
+  }
+]

@@ -1,0 +1,78 @@
+[
+  {
+    "id": "iam_ws_habilitation",
+    "label": "WS Habilitation",
+    "description": "Service d’habilitation interne utilisé pour vérifier les droits CEGEC et calculer le profil utilisateur.",
+    "type": "iam",
+    "layer": "External",
+    "technology": "REST API (OpenFeign)",
+    "url": "${cloud_wshabilitation_url}/wshabilitations/rest/v1",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/users/{casId}/access_rights/CEGEC",
+        "method": "GET"
+      }
+    ],
+    "used_by": [
+      "backend_cegec_api"
+    ]
+  },
+  {
+    "id": "service_ws_annuaire",
+    "label": "WS Annuaire",
+    "description": "Service d’annuaire interne utilisé pour enrichir le contexte utilisateur connecté avec son identité, sa structure et son manager.",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign)",
+    "url": "${cloud_wsannuaire_url}/wsannuaire/api/v1",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/me/person",
+        "method": "GET"
+      }
+    ],
+    "used_by": [
+      "backend_cegec_api"
+    ]
+  },
+  {
+    "id": "service_account_rules_api",
+    "label": "Account Rules API",
+    "description": "Service externe consulté pour récupérer les comptes d’un client à partir de son numéro de personne.",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign)",
+    "url": "${cloud_accountrulesapi_url}/api/v2",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/accounts",
+        "method": "GET"
+      }
+    ],
+    "used_by": [
+      "backend_cegec_api"
+    ]
+  },
+  {
+    "id": "service_card_api",
+    "label": "Card API",
+    "description": "Service externe consulté pour récupérer les cartes d’un client à partir de son numéro de personne.",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign)",
+    "url": "${cloud_cardapi_url}/api/v1",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/cards",
+        "method": "GET"
+      }
+    ],
+    "used_by": [
+      "backend_cegec_api"
+    ]
+  }
+]

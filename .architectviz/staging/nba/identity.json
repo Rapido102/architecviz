@@ -1,0 +1,7 @@
+{
+  "architecture": "nba-api",
+  "type": "BACKEND",
+  "version": "0.1.0",
+  "lastUpdated": "2026-05-21",
+  "description": "- [Quality gate](http://sonarqube-prd.intra.arkea.com:8080/dashboard?id=38B3_nba-api&metric=alert_status) - [Maintainability](http://sonarqube-prd.intra.arkea.com:8080/dashboard?id=38B3_nba-api&metric=sqale_rating) - [Technical debt](http://sonarqube-prd.intra.arkea.com:8080/dashboard?id=38B3_nba-api&metric=sqale_index)"
+}

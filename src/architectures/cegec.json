@@ -1,0 +1,488 @@
+{
+  "architecture": "cegec-api",
+  "type": "FULLSTACK",
+  "version": "0.1.0",
+  "lastUpdated": "2026-05-19",
+  "description": "API backend cegec-api de gestion des gestes commerciaux, construite avec Spring Boot, Jersey (JAX-RS) et clients Feign.",
+  "layers": [
+    {
+      "name": "Frontend",
+      "color": "#E3F2FD",
+      "description": "Couche présentation — interfaces utilisateur, SPA, MFE"
+    },
+    {
+      "name": "Backend",
+      "color": "#FFF3E0",
+      "description": "Couche métier — API REST, services, traitements"
+    },
+    {
+      "name": "Data",
+      "color": "#F3E5F5",
+      "description": "Couche persistance — bases de données, cache, files"
+    },
+    {
+      "name": "External",
+      "color": "#E8F5E9",
+      "description": "Services externes / tiers — APIs partenaires, IAM, monitoring"
+    }
+  ],
+  "components": [
+    {
+      "id": "backend_cegec_api",
+      "label": "CEGEC API",
+      "type": "backend",
+      "layer": "Backend",
+      "technology": "Java 25 + Spring Boot 4.0.3 + Jersey (JAX-RS) + OpenFeign + Spring Data JDBC",
+      "url": "À confirmer",
+      "port": 8080,
+      "authentication": {
+        "type": "JWT via header Authentication",
+        "provider": "WS Habilitation",
+        "token_format": "Authentication: <JWT brut>",
+        "token_expiry": "Porté par le JWT amont ; non contrôlé par l’application",
+        "roles_permissions": "RBAC CEGEC basé sur le niveau d’accès et les structures autorisées renvoyés par WS Habilitation",
+        "note": "Le schéma OpenAPI déclare un header Authentication. Les tests montrent un 401 avec jeton invalide. Les annotations CasHabilitations métier sont encore commentées dans les contrôleurs."
+      },
+      "endpoints": [
+        {
+          "path": "/api/v1/app-params",
+          "method": "GET",
+          "description": "Récupère les paramètres applicatifs et le contexte utilisateur connecté.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authentication"
+            ]
+          },
+          "response_schema": "AppParams",
+          "status_codes": [
+            200,
+            401,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "cache_redis_cegec",
+              "resource": "USER-CONTEXT-*",
+              "operation": "GET",
+              "note": "Lecture cache-aside du contexte utilisateur enrichi."
+            },
+            {
+              "component_id": "cache_redis_cegec",
+              "resource": "USER-CONTEXT-*",
+              "operation": "SET",
+              "note": "Alimentation du cache users avec TTL 10h lors d’un miss."
+            },
+            {
+              "component_id": "iam_ws_habilitation",
+              "resource": "/users/{casId}/access_rights/CEGEC",
+              "operation": "GET"
+            },
+            {
+              "component_id": "service_ws_annuaire",
+              "resource": "/me/person",
+              "operation": "GET"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/form-params",
+          "method": "GET",
+          "description": "Récupère les paramètres nécessaires au formulaire de création de fiche.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authentication"
+            ]
+          },
+          "response_schema": "FormParams",
+          "status_codes": [
+            200,
+            401,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_mysql_cegec",
+              "resource": "t38gcod",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mysql_cegec",
+              "resource": "t38categorie_geste",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/client-products/{numeroPersonne}",
+          "method": "GET",
+          "description": "Récupère les comptes et les cartes d’un client à partir de son numéro de personne.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "numeroPersonne"
+            ],
+            "body": [],
+            "headers": [
+              "Authentication"
+            ]
+          },
+          "response_schema": "CustomerInformationResponseDto",
+          "status_codes": [
+            200,
+            400,
+            401,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "service_account_rules_api",
+              "resource": "/accounts",
+              "operation": "GET"
+            },
+            {
+              "component_id": "service_card_api",
+              "resource": "/cards",
+              "operation": "GET"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/gestures",
+          "method": "GET",
+          "description": "Retourne la liste paginée des gestes commerciaux d’un client, avec filtres optionnels sur le numéro client et la date de création, ainsi que des indicateurs de période.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "numeroClient",
+              "creationDate",
+              "page"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authentication"
+            ]
+          },
+          "response_schema": "GesturesResponse",
+          "status_codes": [
+            200,
+            400
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_mysql_cegec",
+              "resource": "t38fiches",
+              "operation": "SELECT",
+              "note": "Lecture de la liste des gestes, du compteur global et des indicateurs 12 mois via NamedParameterJdbcTemplate."
+            }
+          ]
+        },
+        {
+          "path": "/check",
+          "method": "GET",
+          "description": "Endpoint de healthcheck de l’application.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200
+          ],
+          "validation": "✅ VALID",
+          "data_access": []
+        }
+      ],
+      "deployment": {
+        "containerized": true,
+        "platform": "Docker",
+        "ci_cd": "GitLab CI"
+      },
+      "description": "API CEGEC exposée en Jersey/JAX-RS pour consulter les gestes commerciaux, restituer les paramètres applicatifs et agréger les produits client."
+    },
+    {
+      "id": "db_mysql_cegec",
+      "label": "MySQL CEGEC",
+      "type": "db",
+      "layer": "Data",
+      "technology": "MySQL",
+      "url": "${cloud_mysql_database_cegec_url}",
+      "port": 3306,
+      "consumed_via": "Spring Data JDBC + NamedParameterJdbcTemplate",
+      "tables": [
+        {
+          "name": "t38gcod",
+          "purpose": "Référentiel des codes de gestes commerciaux et de leurs règles d’affichage."
+        },
+        {
+          "name": "t38categorie_geste",
+          "purpose": "Référentiel des catégories de gestes commerciaux."
+        },
+        {
+          "name": "t38fiches",
+          "purpose": "Historique des fiches et gestes commerciaux consultés par l’API."
+        }
+      ],
+      "description": "Base de données CEGEC contenant les fiches de gestes commerciaux et les référentiels nécessaires au formulaire métier."
+    },
+    {
+      "id": "cache_redis_cegec",
+      "label": "Redis Cache CEGEC",
+      "type": "cache",
+      "layer": "Data",
+      "technology": "Redis Sentinel",
+      "port": 26379,
+      "consumed_via": "Spring Cache + spring-boot-starter-data-redis",
+      "cached_data": [
+        {
+          "key_pattern": "USER-CONTEXT-*",
+          "ttl": "10h",
+          "purpose": "Contexte utilisateur enrichi (profil CEGEC, structures autorisées, manager).",
+          "note": "Le préfixe effectif ajoute aussi spring.application.name, env, version et le namespace users.",
+          "endpoint": "/api/v1/app-params"
+        }
+      ],
+      "description": "Cache Redis Sentinel utilisé pour mémoriser le contexte utilisateur enrichi et limiter les appels répétés aux services d’habilitation et d’annuaire.",
+      "url": "${cloud_servers_redis_host_ng}:${cloud_servers_redis_port}"
+    },
+    {
+      "id": "iam_ws_habilitation",
+      "label": "WS Habilitation",
+      "type": "iam",
+      "layer": "External",
+      "technology": "REST API (OpenFeign)",
+      "url": "${cloud_wshabilitation_url}/wshabilitations/rest/v1",
+      "endpoints": [
+        {
+          "path": "/users/{casId}/access_rights/CEGEC",
+          "method": "GET",
+          "description": "Récupère les droits d’accès CEGEC, les structures autorisées et les plafonds de l’utilisateur connecté."
+        }
+      ],
+      "used_by": [
+        "backend_cegec_api"
+      ],
+      "description": "Service d’habilitation interne utilisé pour vérifier les droits CEGEC et calculer le profil utilisateur.",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)"
+    },
+    {
+      "id": "service_ws_annuaire",
+      "label": "WS Annuaire",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign)",
+      "url": "${cloud_wsannuaire_url}/wsannuaire/api/v1",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/me/person",
+          "method": "GET",
+          "description": "Retourne les informations annuaire de la personne connectée : identité, structure, manager et données de contrat."
+        }
+      ],
+      "used_by": [
+        "backend_cegec_api"
+      ],
+      "description": "Service d’annuaire interne utilisé pour enrichir le contexte utilisateur connecté avec son identité, sa structure et son manager."
+    },
+    {
+      "id": "service_account_rules_api",
+      "label": "Account Rules API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign)",
+      "url": "${cloud_accountrulesapi_url}/api/v2",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/accounts",
+          "method": "GET",
+          "description": "Retourne la liste des comptes d’un client à partir de son numéro de personne transmis en en-tête."
+        }
+      ],
+      "used_by": [
+        "backend_cegec_api"
+      ],
+      "description": "Service externe consulté pour récupérer les comptes d’un client à partir de son numéro de personne."
+    },
+    {
+      "id": "service_card_api",
+      "label": "Card API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign)",
+      "url": "${cloud_cardapi_url}/api/v1",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/cards",
+          "method": "GET",
+          "description": "Retourne la liste des cartes d’un client à partir de son numéro de personne transmis en en-tête."
+        }
+      ],
+      "used_by": [
+        "backend_cegec_api"
+      ],
+      "description": "Service externe consulté pour récupérer les cartes d’un client à partir de son numéro de personne."
+    },
+    {
+      "id": "bo_cegec",
+      "label": "Bo Cegec",
+      "type": "frontend",
+      "layer": "Frontend",
+      "technology": "React 19.2.4 + Vite 7.2.7",
+      "url": "À confirmer",
+      "build_tool": "Vite 7.2.7",
+      "state_management": "@tanstack/react-query 5.90.12 (server-state) + react-hook-form 7.68.0 (form-state)",
+      "key_dependencies": [
+        "axios 1.15.0",
+        "@fortuneo/fto-bo-security-lib 1.0.17",
+        "@fortuneo/ui 3.7.0"
+      ],
+      "routes": [
+        {
+          "path": "/gestion-commerciale",
+          "label": "Accueil",
+          "authenticated": true,
+          "description": "Page d’accueil du module BO CEGEC avec accès à la création d’un geste commercial.",
+          "api_calls": []
+        },
+        {
+          "path": "/gestion-commerciale/creation",
+          "label": "Création geste commercial",
+          "authenticated": true,
+          "description": "Parcours de création d’un geste commercial avec recherche client, chargement des paramètres de formulaire et consultation de l’historique des gestes.",
+          "api_calls": [
+            "GET /api/v1/client-products/{numeroPersonne}",
+            "GET /api/v1/form-params",
+            "GET /api/v1/gestures"
+          ]
+        }
+      ],
+      "deployment": {
+        "ci_cd": "GitLab CI"
+      },
+      "description": "Back-office CEGEC permettant la recherche client et le parcours de création d’un geste commercial."
+    }
+  ],
+  "connections": [
+    {
+      "id": "backend_cegec_api_to_service_ws_annuaire",
+      "from": "backend_cegec_api",
+      "to": "service_ws_annuaire",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Récupération des informations annuaire de l'utilisateur connecté."
+    },
+    {
+      "id": "backend_cegec_api_to_service_account_rules_api",
+      "from": "backend_cegec_api",
+      "to": "service_account_rules_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Consultation des comptes client depuis l'API Account Rules."
+    },
+    {
+      "id": "backend_cegec_api_to_service_card_api",
+      "from": "backend_cegec_api",
+      "to": "service_card_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Consultation des cartes client depuis la Card API."
+    },
+    {
+      "id": "bo_cegec_to_backend_cegec_api",
+      "from": "bo_cegec",
+      "to": "backend_cegec_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Appels HTTP sécurisés du frontend BO CEGEC vers l'API backend via la gateway sécurisée Fortuneo.",
+      "client": "axios",
+      "flow": "Browser → gateway sécurisée → backend CEGEC",
+      "endpoint_mappings": [
+        {
+          "frontend_endpoint": "GET /api/v1/client-products/{numeroPersonne}",
+          "backend_endpoint": "/api/v1/client-products/{numeroPersonne}",
+          "method": "GET",
+          "frontend_pages": [
+            "/gestion-commerciale/creation"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /api/v1/form-params",
+          "backend_endpoint": "/api/v1/form-params",
+          "method": "GET",
+          "frontend_pages": [
+            "/gestion-commerciale/creation"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /api/v1/gestures",
+          "backend_endpoint": "/api/v1/gestures",
+          "method": "GET",
+          "frontend_pages": [
+            "/gestion-commerciale/creation"
+          ],
+          "status": "✅ MAPPÉ"
+        }
+      ]
+    },
+    {
+      "id": "backend_cegec_api_to_db_mysql_cegec",
+      "from": "backend_cegec_api",
+      "to": "db_mysql_cegec",
+      "protocol": "JDBC",
+      "authenticated": false,
+      "description": "Lecture des référentiels et de l'historique des gestes dans la base MySQL CEGEC.",
+      "operations": [
+        "SELECT"
+      ]
+    },
+    {
+      "id": "backend_cegec_api_to_cache_redis_cegec",
+      "from": "backend_cegec_api",
+      "to": "cache_redis_cegec",
+      "protocol": "Redis",
+      "authenticated": false,
+      "description": "Cache distribué du contexte utilisateur enrichi pour limiter les appels IAM et annuaire.",
+      "operations": [
+        "GET",
+        "SET"
+      ],
+      "cache_strategy": "Cache-aside"
+    },
+    {
+      "id": "backend_cegec_api_to_iam_ws_habilitation",
+      "from": "backend_cegec_api",
+      "to": "iam_ws_habilitation",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Consultation du service d’habilitation pour récupérer les droits CEGEC de l’utilisateur connecté."
+    }
+  ],
+  "flow_summary": {
+    "technologies_count": 12,
+    "backend_endpoints": 5,
+    "frontend_routes": 2,
+    "external_services": 4
+  }
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "iam_oidc",
+    "label": "OIDC Provider",
+    "description": "Fournisseur d'identité OIDC référencé par la configuration de sécurité partagée du consumer d'archivage Notify.",
+    "type": "iam",
+    "layer": "External",
+    "technology": "OIDC",
+    "url": "${OIDC_ISSUER_URI}",
+    "used_by": [
+      "backend_notify_records_consumer"
+    ]
+  }
+]

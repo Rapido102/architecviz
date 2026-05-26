@@ -1,0 +1,25 @@
+[
+  {
+    "id": "gesparam_service",
+    "label": "Gesparam Services",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign 13.6)",
+    "url": "${cloud_gesparamservices_url}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "description": "Service externe utilisé pour récupérer les tables de paramétrage des actions et produits NBA.",
+    "endpoints": [
+      {
+        "path": "/gesparamservices/api/v1/tables/T38NACT",
+        "method": "GET"
+      },
+      {
+        "path": "/gesparamservices/api/v1/tables/T38NPRD",
+        "method": "GET"
+      }
+    ],
+    "used_by": [
+      "backend_spring"
+    ]
+  }
+]

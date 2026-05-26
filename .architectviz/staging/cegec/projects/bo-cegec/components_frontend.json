@@ -1,0 +1,16 @@
+[
+  {
+    "id": "bo_cegec",
+    "label": "Bo Cegec",
+    "type": "frontend",
+    "layer": "Frontend",
+    "technology": "React 19.2.4 + Vite 7.2.7",
+    "url": "À confirmer",
+    "build_tool": "Vite 7.2.7",
+    "state_management": "@tanstack/react-query 5.90.12 (server-state) + react-hook-form 7.68.0 (form-state)",
+    "routes": [],
+    "deployment": {
+      "ci_cd": "GitLab CI"
+    }
+  }
+]

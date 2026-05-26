@@ -1,0 +1,104 @@
+[
+  {
+    "id": "bo_flow_distribution",
+    "label": "Bo Flow Distribution",
+    "type": "frontend",
+    "layer": "Frontend",
+    "technology": "React 19.0.0 + Vite 5.0.11 + @mui/material 6.4.8",
+    "url": "À confirmer",
+    "build_tool": "Vite 5.0.11",
+    "state_management": "@tanstack/react-query 5.60.6 (server-state) + zustand 5.0.1 (client-state)",
+    "description": "Interface back-office de distribution des flux permettant de consulter le planning et l’historique des répartitions, créer ou remplacer des répartitions, ajuster les curseurs Smart/Premium et importer des prévisions CSV.",
+    "routes": [
+      {
+        "path": "/flow-distribution",
+        "label": "Point d'entrée",
+        "authenticated": true,
+        "description": "Route d’entrée qui charge les paramètres applicatifs, vérifie l’habilitation puis redirige vers l’espace de gestion ou la page non autorisée.",
+        "api_calls": [
+          "GET /app-params"
+        ]
+      },
+      {
+        "path": "/flow-distribution/unauthorized",
+        "label": "Accès non autorisé",
+        "authenticated": false,
+        "description": "Page d’information affichée lorsque l’utilisateur n’est pas habilité à accéder à l’interface.",
+        "api_calls": []
+      },
+      {
+        "path": "/flow-distribution/repartitions",
+        "label": "Répartitions",
+        "authenticated": true,
+        "description": "Écran principal de consultation et pilotage des répartitions avec vues tableau et agenda, historique, interruption, suppression et ouverture du détail.",
+        "api_calls": [
+          "GET /repartitions?product={product}&date={date}",
+          "GET /repartition/active?date={date}&product={product}",
+          "GET /repartition/history?product={product}&startDate={startDate}&endDate={endDate}&text={text}&type={type}",
+          "GET /planning?weekNumber={weekNumber}&year={year}&product={product}",
+          "GET /allocation/{id}",
+          "PATCH /repartition/interruption?idRepartition={id}",
+          "DELETE /repartition?idRepartition={id}"
+        ]
+      },
+      {
+        "path": "/flow-distribution/create",
+        "label": "Créer une répartition",
+        "authenticated": true,
+        "description": "Formulaire de création ou duplication d’une répartition avec paramétrage des dates, canaux, populations et prestataires.",
+        "api_calls": [
+          "POST /repartition"
+        ]
+      },
+      {
+        "path": "/flow-distribution/replace",
+        "label": "Remplacer une répartition",
+        "authenticated": true,
+        "description": "Formulaire de modification d’une répartition existante via un parcours de remplacement.",
+        "api_calls": [
+          "POST /repartition/replace"
+        ]
+      },
+      {
+        "path": "/flow-distribution/score",
+        "label": "Curseurs Smart / Premium",
+        "authenticated": true,
+        "description": "Écran de consultation des curseurs Smart/Premium courants et de leur historique.",
+        "api_calls": [
+          "GET /scores"
+        ]
+      },
+      {
+        "path": "/flow-distribution/score/update",
+        "label": "Modifier les curseurs",
+        "authenticated": true,
+        "description": "Écran d’édition des curseurs d’appel et d’email avec validation et enregistrement.",
+        "api_calls": [
+          "GET /scores",
+          "POST /scores"
+        ]
+      },
+      {
+        "path": "/flow-distribution/forecast",
+        "label": "Import des prévisions",
+        "authenticated": true,
+        "description": "Écran d’import CSV des prévisions avec contrôles de format et de taille avant envoi au backend.",
+        "api_calls": [
+          "POST /report-file"
+        ]
+      },
+      {
+        "path": "/flow-distribution/read",
+        "label": "Lire une répartition",
+        "authenticated": true,
+        "description": "Vue détaillée en lecture seule d’une répartition sélectionnée depuis le planning ou l’historique.",
+        "api_calls": [
+          "GET /repartition?idRepartition={id}"
+        ]
+      }
+    ],
+    "deployment": {
+      "ci_cd": "GitLab CI"
+    }
+  }
+]

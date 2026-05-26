@@ -1,0 +1,58 @@
+[
+  {
+    "id": "backend_cegec_api_to_iam_ws_habilitation",
+    "from": "backend_cegec_api",
+    "to": "iam_ws_habilitation",
+    "protocol": "OIDC/HTTPS",
+    "authenticated": false
+  },
+  {
+    "id": "backend_cegec_api_to_service_ws_annuaire",
+    "from": "backend_cegec_api",
+    "to": "service_ws_annuaire",
+    "protocol": "REST/HTTPS",
+    "authenticated": true
+  },
+  {
+    "id": "backend_cegec_api_to_service_account_rules_api",
+    "from": "backend_cegec_api",
+    "to": "service_account_rules_api",
+    "protocol": "REST/HTTPS",
+    "authenticated": true
+  },
+  {
+    "id": "backend_cegec_api_to_service_card_api",
+    "from": "backend_cegec_api",
+    "to": "service_card_api",
+    "protocol": "REST/HTTPS",
+    "authenticated": true
+  },
+  {
+    "id": "backend_spring_to_account_client_api",
+    "from": "backend_spring",
+    "to": "account_client_api",
+    "protocol": "REST/HTTPS",
+    "authenticated": true
+  },
+  {
+    "id": "backend_spring_to_card_client_api",
+    "from": "backend_spring",
+    "to": "card_client_api",
+    "protocol": "REST/HTTPS",
+    "authenticated": true
+  },
+  {
+    "id": "backend_spring_to_wsannuaire_client_api",
+    "from": "backend_spring",
+    "to": "wsannuaire_client_api",
+    "protocol": "REST/HTTPS",
+    "authenticated": true
+  },
+  {
+    "id": "backend_spring_to_wshabilitation_client_api",
+    "from": "backend_spring",
+    "to": "wshabilitation_client_api",
+    "protocol": "REST/HTTPS",
+    "authenticated": true
+  }
+]

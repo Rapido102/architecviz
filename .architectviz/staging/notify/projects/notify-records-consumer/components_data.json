@@ -1,0 +1,27 @@
+[
+  {
+    "id": "db_postgres",
+    "label": "PostgreSQL",
+    "description": "Bases PostgreSQL utilisées par les services Notify pour persister l’historique des notifications, les mappings de dispatch et les erreurs de traitement rejouables.",
+    "type": "db",
+    "layer": "Data",
+    "technology": "PostgreSQL",
+    "url": "${DATASOURCE_URL}",
+    "port": 5432,
+    "consumed_via": "Spring JDBC",
+    "tables": [
+      {
+        "name": "T38NOTIFY_RECORDS",
+        "purpose": "Stocke les notifications Notify avec leur identifiant, statut, template, contenu, sujet, destinataire, métadonnées et horodatages de création/mise à jour."
+      },
+      {
+        "name": "t38event_mapping_notify",
+        "purpose": "Associe chaque type d'événement aux paramètres de notification à utiliser, notamment canal et template."
+      },
+      {
+        "name": "t38err_notify_disp",
+        "purpose": "Conserve les erreurs de dispatch de notifications afin de permettre leur consultation, leur rejeu et leur suppression."
+      }
+    ]
+  }
+]

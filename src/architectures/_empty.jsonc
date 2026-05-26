@@ -1,0 +1,424 @@
+// ==============================================================================
+// TEMPLATE ArchitectViz — Fichier annoté
+// Copier ce fichier sous src/architectures/<mon-si>.json (ou .jsonc)
+// et remplir chaque champ. Les commentaires sont ignorés par le chargeur.
+// Pour générer le contenu automatiquement :
+//   → Frontend : prompts/analyze-frontend.md
+//   → Backend  : prompts/analyze-backend.md
+//   → Fusion   : prompts/update-architecture.md
+// ==============================================================================
+{
+  // ── IDENTITÉ ────────────────────────────────────────────────────────────────
+
+  // Nom affiché dans le sélecteur d'ArchitectViz et en haut du canvas.
+  // Doit être court et reconnaissable (ex: "CEGeC", "Portail Client", "API Gateway").
+  "architecture": "Nouvelle architecture",
+
+  // Type global du système. Valeurs acceptées :
+  //   FULLSTACK    → frontend + backend dans le même scope de cartographie
+  //   BACKEND      → uniquement API / services (pas de frontend dans le périmètre)
+  //   FRONTEND     → uniquement SPA / MFE
+  //   MICROSERVICES → ensemble de micro-services (beaucoup de composants backend)
+  //   MONOLITH     → application unique déployée d'un seul tenant
+  //   DATA         → pipelines de données, ETL, data lake (peu de frontend)
+  //   OTHER        → autre (à préciser dans description)
+  "type": "OTHER",
+
+  // Version du document au format SemVer. (Optionnel — omis dans les scans frontend)
+  //   0.1.0 → première ébauche
+  //   patch : correction de données / mise à jour de versions de libs
+  //   minor : nouveau composant, nouvelle connexion, nouvelle couche
+  //   major : refonte de l'architecture, changement de protocole central
+  "version": "0.1.0",
+
+  // Date de dernière mise à jour — format ISO YYYY-MM-DD.
+  "lastUpdated": "1970-01-01",
+
+  // Description fonctionnelle (1-2 phrases). Audience : architecte, PO, équipe.
+  // Répond à : "à quoi sert ce SI ?" — pas comment il est fait.
+  "description": "À renseigner.",
+
+  // ── COUCHES (LAYERS) ────────────────────────────────────────────────────────
+  // Les couches structurent le canvas : légende, filtre header, couleur des nœuds.
+  // Optionnel pour les scans frontend auto-générés — nœuds sans couleur de couche si absent.
+  // Chaque composant déclare sa couche via components[].layer (doit matcher ici).
+  // color : hex #RRGGBB — choisir des pastels pour la lisibilité du canvas.
+  "layers": [
+    {
+      // Identifiant de la couche. Référencé dans components[].layer.
+      "name": "Frontend",
+      // Couleur de fond des nœuds appartenant à cette couche.
+      "color": "#E3F2FD",
+      // Description affichée dans la légende ArchitectViz.
+      "description": "Couche présentation — interfaces utilisateur, SPA, MFE"
+    },
+    {
+      "name": "Backend",
+      "color": "#FFF3E0",
+      "description": "Couche métier — API REST, services, traitements"
+    },
+    {
+      "name": "Data",
+      "color": "#F3E5F5",
+      "description": "Couche persistance — bases de données, cache, files"
+    },
+    {
+      "name": "External",
+      "color": "#E8F5E9",
+      "description": "Services externes / tiers — APIs partenaires, IAM, monitoring"
+    }
+    // Ajouter des couches selon le besoin :
+    // { "name": "Gateway", "color": "#FBE9E7", "description": "API Gateway / BFF" }
+  ],
+
+  // ── COMPOSANTS ──────────────────────────────────────────────────────────────
+  // Un composant = un bloc sur le canvas.
+  // Règles :
+  //   • id        : unique dans le fichier, snake_case ([a-z0-9_-]+)
+  //   • layer     : doit matcher un layers[].name
+  //   • type      : voir liste ci-dessous
+  //   • technology: "NomLib version" (ex: "Spring Boot 4.0.3"), le plus précis possible
+  "components": [
+    // ── Exemple : composant Frontend ──────────────────────────────────────────
+    {
+      // Identifiant unique — utilisé dans connections.from / connections.to
+      "id": "frontend_react",
+
+      // Libellé affiché sur le nœud du canvas
+      "label": "React SPA Frontend",
+
+      // Type du composant. Valeurs autorisées :
+      //   frontend    → SPA, MFE, PWA
+      //   backend     → API REST, gRPC, BFF
+      //   cache       → Redis, Memcached, Hazelcast (in-memory, sans persistance)
+      //   db          → PostgreSQL, MySQL, MongoDB, Oracle… (avec persistance)
+      //   queue       → SQS, Bull, BullMQ (file de tâches point-à-point)
+      //   mq          → Kafka, RabbitMQ, Azure Service Bus (pub/sub ou streaming)
+      //   batch       → job planifié (Spring Batch, Quartz, cron)
+      //   etl         → pipeline de données (Airflow, dbt, Spring Cloud Data Flow)
+      //   iam         → service d'auth/authz (Keycloak, Auth0, WS Habilitation)
+      //   monitoring  → observabilité (Datadog, Prometheus, ELK, Sentry)
+      //   service     → service interne générique (quand aucun autre type ne convient)
+      //   third-party → API externe non maîtrisée (partenaire, SaaS)
+      "type": "frontend",
+
+      // Couche — doit matcher un layers[].name exactement
+      "layer": "Frontend",
+
+      // Stack technique complète avec versions (sources : package.json, pom.xml, etc.)
+      "technology": "React X + Vite X + TailwindCSS",
+
+      // URL de l'application (prod ou VAL/preprod). "À confirmer" si inconnu.
+      "url": "https://À-confirmer",
+
+      // Outil de build (Vite, Webpack, Turbopack, esbuild…) avec version
+      "build_tool": "À confirmer",
+
+      // Gestion d'état : lister toutes les libs impliquées séparées par " + "
+      // (server-state, client-state, form-state, etc.)
+      "state_management": "À confirmer",
+
+      // ── Routes exposées par ce frontend ──
+      // Une entrée par route/page.
+      "routes": [
+        {
+          // Chemin de la route (ex: "/cegec/:id", "/dashboard", "/login")
+          "path": "/",
+          // Titre de la page ou du composant racine
+          "label": "Accueil",
+          // true si la route nécessite une authentification (guard, middleware, ProtectedRoute)
+          "authenticated": false,
+          // Description fonctionnelle de la page
+          "description": "Page d'accueil.",
+          // Liste des appels HTTP émis depuis cette page.
+          // Format : "METHOD /endpoint?param=valeur"
+          "api_calls": [
+            "GET /api/v1/example"
+          ]
+        }
+      ]
+    },
+
+    // ── Exemple : composant Backend ───────────────────────────────────────────
+    {
+      "id": "backend_api",
+      "label": "Spring Boot API",
+      "type": "backend",
+      "layer": "Backend",
+      "technology": "Java X + Spring Boot X",
+      "url": "http://localhost:8080",
+      "port": 8080,
+
+      // ── Authentification portée par ce backend ──
+      // Renseigner si ce composant valide/émet des tokens d'authentification.
+      "authentication": {
+        // Type de mécanisme : "OAuth2 (JWT Bearer Token)", "Basic Auth", "mTLS", "API Key"
+        "type": "OAuth2 (JWT Bearer Token)",
+        // Fournisseur du token : Keycloak, Auth0, WS Habilitation, AWS Cognito, etc.
+        "provider": "À confirmer",
+        // Format du header ou du cookie portant le token
+        "token_format": "Authorization: Bearer <JWT>",
+        // Durée de vie du token (ex: "1h", "24h", "À confirmer")
+        "token_expiry": "À confirmer",
+        // Modèle de permissions : "RBAC (rôles)", "ABAC", "Scopes OAuth2", etc.
+        "roles_permissions": "À confirmer",
+        // Note libre (ex: "Toutes les routes nécessitent le header Authorization")
+        "note": ""
+      },
+
+      // ── Endpoints exposés par ce backend ──
+      // Un objet par endpoint HTTP.
+      "endpoints": [
+        {
+          // Chemin relatif (ex: "/api/v1/items", "/api/v1/items/{id}")
+          "path": "/api/v1/items",
+          // Méthode HTTP : GET | POST | PUT | PATCH | DELETE | HEAD | OPTIONS
+          "method": "GET",
+          // true si cet endpoint nécessite un token d'auth
+          "authenticated": true,
+          // Paramètres attendus par catégorie (aucun champ n'est obligatoire)
+          "params": {
+            "query": ["page", "size", "sort"],
+            "path": [],
+            "body": [],
+            "headers": ["Authorization"]
+          },
+          // Type de réponse (nom du DTO ou description)
+          "response_schema": "Item[]",
+          // Codes HTTP possibles en réponse
+          "status_codes": [200, 401, 403, 500],
+          // Route frontend qui appelle cet endpoint (pour traçabilité)
+          "mapped_from_frontend": "/ (GET /api/v1/items)",
+          // Statut de validation du mapping : "✅ MAPPÉ", "⚠️ À VÉRIFIER", "❌ NON MAPPÉ"
+          "validation": "✅ MAPPÉ"
+        }
+      ],
+
+      "deployment": {
+        "platform": "À confirmer",
+        "ci_cd": "À confirmer",
+        "containerized": true,
+        "orchestration": "À confirmer"
+      }
+    },
+
+    // ── Exemple : composant Cache ─────────────────────────────────────────────
+    {
+      "id": "cache_redis",
+      "label": "Redis Cache",
+      "type": "cache",
+      "layer": "Data",
+      "technology": "Redis X",
+      "url": "redis://host:6379",
+      "port": 6379,
+      "deployment": {
+        "platform": "On-prem DC"
+      },
+      // Données mises en cache — une entrée par pattern de clé.
+      "cached_data": [
+        {
+          // Endpoint source qui génère cette entrée de cache (optionnel)
+          "endpoint": "/api/v1/params",
+          // Pattern de la clé Redis (ex: "session:*", "user:{id}:perms")
+          "key_pattern": "app:params:*",
+          // Durée de vie (ex: "1h", "24h", "no-expiry")
+          "ttl": "1h",
+          // Objet métier mis en cache
+          "purpose": "Paramètres applicatifs globaux"
+        }
+      ]
+    },
+
+    // ── Exemple : composant Base de données ───────────────────────────────────
+    {
+      "id": "db_postgres",
+      "label": "PostgreSQL",
+      "type": "db",
+      "layer": "Data",
+      "technology": "PostgreSQL 15",
+      "url": "${POSTGRES_URL}",
+      "port": 5432,
+      // Lib ou ORM utilisé pour accéder à cette DB
+      "consumed_via": "JPA / Hibernate",
+      "deployment": {
+        "platform": "On-prem DC"
+      }
+    },
+
+    // ── Exemple : composant IAM ───────────────────────────────────────────────
+    {
+      "id": "iam_keycloak",
+      "label": "Keycloak IAM",
+      "type": "iam",
+      "layer": "External",
+      "technology": "Keycloak X",
+      "url": "https://auth.example.com",
+      "endpoints": [
+        { "path": "/realms/{realm}/protocol/openid-connect/token", "method": "POST" },
+        { "path": "/realms/{realm}/protocol/openid-connect/userinfo", "method": "GET" }
+      ],
+      // Composants qui consomment ce service IAM
+      "used_by": ["backend_api"]
+    },
+
+    // ── Exemple : composant Third-Party ───────────────────────────────────────
+    {
+      "id": "account_api",
+      "label": "Account API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API",
+      // Utiliser la variable d'env plutôt qu'une URL de prod réelle
+      "url": "${ACCOUNT_API_URL}",
+      // Mécanisme de consommation côté backend
+      "consumed_via": "OpenFeign / axios",
+      "endpoints": [
+        { "path": "/accounts/{id}", "method": "GET" }
+      ],
+      "used_by": ["backend_api"]
+    }
+
+    // ── Autres types disponibles (exemples minimalistes) ─────────────────────
+    // Queue :
+    // { "id": "queue_tasks", "label": "Task Queue", "type": "queue", "layer": "Data",
+    //   "technology": "BullMQ + Redis", "description": "File de tâches asynchrones.",
+    //   "consumed_via": "BullMQ Worker" }
+    //
+    // Message Broker :
+    // { "id": "mq_kafka", "label": "Kafka", "type": "mq", "layer": "Data",
+    //   "technology": "Kafka 3.x", "description": "Bus d'événements.",
+    //   "consumed_via": "Spring Kafka / confluent-kafka-python" }
+    //
+    // Batch :
+    // { "id": "batch_nightly", "label": "Batch nightly", "type": "batch", "layer": "Backend",
+    //   "technology": "Spring Batch 5", "description": "Traitement nocturne des rapports.",
+    //   "deployment": { "platform": "Kubernetes CronJob", "ci_cd": "GitLab CI" } }
+    //
+    // ETL :
+    // { "id": "etl_pipeline", "label": "Data Pipeline", "type": "etl", "layer": "Data",
+    //   "technology": "Apache Airflow 2.9", "description": "Ingestion et transformation des données." }
+    //
+    // Monitoring :
+    // { "id": "monitoring_datadog", "label": "Datadog", "type": "monitoring", "layer": "External",
+    //   "technology": "Datadog Agent", "description": "APM, logs centralisés, alerting." }
+  ],
+
+  // ── CONNEXIONS ──────────────────────────────────────────────────────────────
+  // Une connexion = une flèche sur le canvas entre deux composants.
+  // from / to : doivent référencer des components[].id existants.
+  "connections": [
+    {
+      // Identifiant unique de la connexion
+      "id": "frontend_to_backend",
+
+      // ID du composant source (d'où part la flèche)
+      "from": "frontend_react",
+
+      // ID du composant cible (où pointe la flèche)
+      "to": "backend_api",
+
+      // Protocole de communication : "REST/HTTPS", "gRPC", "GraphQL", "WebSocket",
+      //   "Kafka", "AMQP", "JDBC", "Redis", "SOAP/REST", etc.
+      "protocol": "REST/HTTPS",
+
+      // true si la connexion nécessite un token / credential
+      "authenticated": true,
+
+      // Description de la connexion (sens, usage, fréquence)
+      "description": "Appels synchrones du frontend vers l'API.",
+
+      // Client HTTP utilisé (ex: "OpenFeign", "axios", "fetch", "Ky")
+      "client": "fetch",
+
+      // Description du flux en phrase (optionnel — aide à la lecture du canvas)
+      "flow": "Browser → JWT → API → Réponse",
+
+      // Mappings frontend↔backend — une entrée par endpoint appelé.
+      // Clé pour la traçabilité et le panneau inspecteur.
+      "endpoint_mappings": [
+        {
+          // Appel tel qu'exprimé côté frontend (url construite dans le code)
+          "frontend_endpoint": "GET /api/v1/items",
+          // Route exacte exposée par le backend
+          "backend_endpoint": "/api/v1/items",
+          // Méthode HTTP
+          "method": "GET",
+          // Pages/routes qui effectuent cet appel
+          "frontend_pages": ["/"],
+          // Description fonctionnelle du mapping
+          "purpose": "Charger la liste paginée des éléments",
+          // Statut de validation : "✅ MAPPÉ", "⚠️ À VÉRIFIER", "❌ NON MAPPÉ"
+          "status": "✅ MAPPÉ"
+        }
+      ],
+
+      // Note libre (ex: "✅ TOUS LES ENDPOINTS MAPPÉS", "⚠️ PAGINATION NON IMPLÉMENTÉE")
+      "note": ""
+    },
+
+    {
+      "id": "backend_to_cache",
+      "from": "backend_api",
+      "to": "cache_redis",
+      "protocol": "Redis",
+      "authenticated": false,
+      "description": "Lecture/écriture du cache distribué.",
+      // Opérations Redis utilisées
+      "operations": ["GET", "SET", "DELETE", "EXPIRE"],
+      // Stratégie de cache : "Cache-aside", "Write-through", "Read-through", "Write-behind"
+      "cache_strategy": "Cache-aside"
+    },
+
+    {
+      "id": "backend_to_iam",
+      "from": "backend_api",
+      "to": "iam_keycloak",
+      "protocol": "OIDC/HTTPS",
+      "authenticated": false,
+      "description": "Validation des tokens JWT et récupération des rôles.",
+      // Description du flux de validation (utile pour la revue de sécurité)
+      "flow": "Request JWT → Backend → Keycloak /userinfo → Roles → Backend → Response"
+    },
+
+    {
+      "id": "backend_to_account",
+      "from": "backend_api",
+      "to": "account_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Appels vers l'API tierce pour enrichir les données.",
+      "client": "OpenFeign"
+    }
+  ],
+
+  // ── RÉSUMÉ DU FLUX ──────────────────────────────────────────────────────────
+  // Affiché dans le panneau "Flow Summary" en bas à gauche du canvas.
+  // À recalculer après chaque mise à jour des composants et connexions.
+  "flow_summary": {
+    // Phrase décrivant le chemin principal utilisateur de bout en bout
+    "user_flow": "Browser → REST API → Cache + DB + Services externes",
+    // Nombre de technologies distinctes dans l'ensemble du SI
+    "technologies_count": 0,
+    // Nombre total d'endpoints exposés par les composants backend
+    "backend_endpoints": 0,
+    // Nombre total de routes exposées par les composants frontend
+    "frontend_routes": 0,
+    // Nombre de composants avec layer === "External"
+    "external_services": 0
+  },
+
+  // ── AVERTISSEMENTS ──────────────────────────────────────────────────────────
+  // Apparaissent dans le panneau "Flow Summary" (rouge) et la barre de status.
+  // severity : WARNING (risque fonctionnel), INFO (à compléter), CRITICAL (bloquant)
+  "warnings": [
+    {
+      "severity": "INFO",
+      // Message court et actionnable
+      "message": "Architecture template non renseignée",
+      // ID du composant concerné (ou "global" si transversal)
+      "component": "global",
+      // Action recommandée
+      "suggestion": "Lancer les prompts analyze-frontend.md et analyze-backend.md"
+    }
+  ]
+}

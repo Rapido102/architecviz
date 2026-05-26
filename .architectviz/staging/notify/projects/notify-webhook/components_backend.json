@@ -1,0 +1,74 @@
+[
+  {
+    "id": "backend_notify_webhook",
+    "label": "Notify Webhook Backend",
+    "description": "API backend recevant les webhooks Notify et republie leur payload sous forme d'événements Kafka. Expose aussi un endpoint de healthcheck simple.",
+    "type": "backend",
+    "layer": "Backend",
+    "technology": "Java 25 + Spring Boot 4.0.1 + Jersey (JAX-RS)",
+    "url": "À confirmer",
+    "port": 8080,
+    "authentication": {
+      "type": "Aucune (endpoints permitAll)",
+      "provider": "Aucun",
+      "token_format": "N/A",
+      "token_expiry": "N/A",
+      "roles_permissions": "Aucun",
+      "note": "La SecurityFilterChain autorise toutes les requêtes. Un filtre JAX-RS @ValidAuthorizationRequired existe et délègue la validation d'un bearer token à oauth_api, mais aucune ressource détectée n'utilise cette annotation."
+    },
+    "endpoints": [
+      {
+        "path": "/api/v1/webhook",
+        "method": "POST",
+        "description": "Reçoit un webhook Notify puis publie un événement Kafka contenant le payload reçu.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "NotifyWebhook"
+          ],
+          "headers": []
+        },
+        "response_schema": "void",
+        "status_codes": [
+          204,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "mq_kafka",
+            "resource": "${cloud_kafka_notify_webhook_notifications_topic_name}",
+            "operation": "PUBLISH",
+            "note": "Publication via KafkaTemplate<String, ArkeaEvent<?>>"
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/check",
+        "method": "GET",
+        "description": "Retourne un message texte indiquant que l'API est disponible.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": []
+      }
+    ],
+    "deployment": {
+      "containerized": true,
+      "platform": "Docker",
+      "ci_cd": "GitLab CI"
+    }
+  }
+]

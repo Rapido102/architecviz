@@ -1,0 +1,595 @@
+{
+  "architecture": "Mock Archi (Showcase)",
+  "type": "FULLSTACK",
+  "version": "1.0.0",
+  "lastUpdated": "2026-05-21",
+  "description": "Architecture de démonstration exerçant 100% du modèle de données ArchitectViz : les 12 types de composants, endpoints complets (params, contrat request/response, data_access, provenance), routes, tables, cache, file, broker, IAM, monitoring, batch, ETL, service interne et tiers lié à une autre architecture. Sert de référence visuelle et de données pour une cartographie « complète ».",
+  "layers": [
+    { "name": "Frontend", "color": "#E3F2FD", "description": "Couche présentation — SPA, MFE, portails" },
+    { "name": "Backend", "color": "#FFF3E0", "description": "Couche métier — API REST, services, traitements" },
+    { "name": "Data", "color": "#F3E5F5", "description": "Couche persistance — bases, cache, files, brokers" },
+    { "name": "External", "color": "#E8F5E9", "description": "Services externes / tiers — IAM, monitoring, APIs partenaires" }
+  ],
+  "components": [
+    {
+      "id": "mfe_portal",
+      "label": "Portal MFE",
+      "type": "frontend",
+      "layer": "Frontend",
+      "technology": "React 19.0.0 + Vite 5.0.11 + Module Federation 0.3.3",
+      "url": "${PORTAL_URL}",
+      "build_tool": "Vite 5.0.11",
+      "state_management": "@reduxjs/toolkit 2.5.0",
+      "description": "Micro-frontend exposant le parcours conseiller, intégré dans la coque applicative via Module Federation.",
+      "owner": "Jane Doe",
+      "team": "Squad Conseiller",
+      "criticality": "high",
+      "environment": "production",
+      "provenance": "manual",
+      "confidence": 1,
+      "key_dependencies": ["axios 1.7.9", "@fortuneo/ui 2.1.3", "@sofa/federation 0.3.3"],
+      "routes": [
+        {
+          "path": "/portal/customers",
+          "label": "Liste clients",
+          "authenticated": true,
+          "description": "Liste paginée des clients avec recherche et filtres.",
+          "api_calls": ["GET /api/v1/customers", "GET /api/v1/customers/{id}"]
+        },
+        {
+          "path": "/portal/customers/new",
+          "label": "Création client",
+          "authenticated": true,
+          "description": "Formulaire de création d'un client.",
+          "api_calls": ["POST /api/v1/customers"]
+        },
+        {
+          "path": "/portal/customers/{id}/edit",
+          "label": "Édition client",
+          "authenticated": true,
+          "description": "Édition partielle d'un client existant.",
+          "api_calls": ["PATCH /api/v1/customers/{id}"]
+        }
+      ],
+      "deployment": {
+        "platform": "Arkéa S3",
+        "region": "eu-west-3",
+        "ci_cd": "GitLab CI + Jenkins",
+        "module_federation": "Webpack 5 Module Federation",
+        "containerized": false,
+        "note": "Servi en statique derrière le CDN, monté à l'exécution par la coque."
+      }
+    },
+    {
+      "id": "backend_core_api",
+      "label": "Core API",
+      "type": "backend",
+      "layer": "Backend",
+      "technology": "Java 25 + Spring Boot 4.0.1 + Jersey (JAX-RS) + OpenFeign",
+      "url": "${CORE_API_URL}",
+      "port": 8080,
+      "description": "API métier principale : gestion des clients, orchestration des recommandations et publication d'évènements.",
+      "owner": "John Smith",
+      "team": "Squad Core",
+      "criticality": "critical",
+      "environment": "production",
+      "provenance": "llm",
+      "confidence": 0.9,
+      "consumed_via": "REST/HTTPS",
+      "http_client_config": { "connectTimeout": "2s", "readTimeout": "5s", "retries": "2" },
+      "key_dependencies": ["spring-boot-starter-web 4.0.1", "openfeign 13.5", "spring-kafka 3.2.0"],
+      "authentication": {
+        "type": "JWT + OIDC",
+        "provider": "Keycloak",
+        "token_format": "Authorization: Bearer <JWT>",
+        "token_expiry": "1h",
+        "roles_permissions": "AuthenticationRequired + roles [CUSTOMER_READ, CUSTOMER_WRITE]",
+        "note": "Refresh token rotatif géré côté coque applicative."
+      },
+      "endpoints": [
+        {
+          "path": "/api/v1/health",
+          "method": "GET",
+          "description": "Sonde de disponibilité du service.",
+          "authenticated": false,
+          "params": { "query": [], "path": [], "body": [], "headers": [] },
+          "response_schema": "HealthDto",
+          "status_codes": [200, 503],
+          "validation": "VALID",
+          "provenance": "auto",
+          "confidence": 1,
+          "response_fields": [
+            { "name": "status", "type": "string", "description": "UP | DOWN", "required": true },
+            { "name": "checks", "type": "Map<String,String>", "description": "État par dépendance", "required": false }
+          ]
+        },
+        {
+          "path": "/api/v1/customers/{id}",
+          "method": "GET",
+          "description": "Consulter un client par identifiant (avec recommandations enrichies).",
+          "authenticated": true,
+          "params": { "query": ["expand"], "path": ["id"], "body": [], "headers": ["Authorization"] },
+          "response_schema": "CustomerDto",
+          "status_codes": [200, 401, 403, 404, 500],
+          "validation": "VALID",
+          "provenance": "manual",
+          "confidence": 1,
+          "response_fields": [
+            { "name": "id", "type": "UUID", "description": "Identifiant client", "required": true },
+            { "name": "firstName", "type": "string", "required": true },
+            { "name": "lastName", "type": "string", "required": true },
+            { "name": "email", "type": "string", "required": true },
+            { "name": "recommendations", "type": "List<RecommendationDto>", "description": "Recommandations NBA", "required": false }
+          ],
+          "data_access": [
+            { "component_id": "cache_redis", "resource": "customer::{id}", "operation": "GET", "provenance": "auto", "confidence": 0.8, "evidence": "CustomerService @Cacheable" },
+            { "component_id": "cache_redis", "resource": "customer::{id}", "operation": "SET", "note": "Alimentation au cache miss", "provenance": "auto", "confidence": 0.8 },
+            { "component_id": "db_postgres", "resource": "customers", "operation": "SELECT", "provenance": "manual", "confidence": 1 },
+            { "component_id": "db_postgres", "resource": "segments", "operation": "SELECT", "note": "Libellé du segment commercial", "provenance": "manual", "confidence": 1 },
+            { "component_id": "third_party_nba", "resource": "/nba/recommendations", "operation": "GET", "note": "Si expand=recommendations", "provenance": "llm", "confidence": 0.7 }
+          ]
+        },
+        {
+          "path": "/api/v1/customers",
+          "method": "GET",
+          "description": "Lister les clients avec pagination et filtres.",
+          "authenticated": true,
+          "params": { "query": ["page", "size", "search"], "path": [], "body": [], "headers": ["Authorization"] },
+          "response_schema": "Page<CustomerDto>",
+          "status_codes": [200, 401, 403, 500],
+          "validation": "VALID",
+          "provenance": "manual",
+          "confidence": 1,
+          "data_access": [
+            { "component_id": "db_postgres", "resource": "customers", "operation": "SELECT", "provenance": "manual", "confidence": 1 }
+          ]
+        },
+        {
+          "path": "/api/v1/customers",
+          "method": "POST",
+          "description": "Créer un client et publier l'évènement de création.",
+          "authenticated": true,
+          "params": { "query": [], "path": [], "body": ["CreateCustomerRequest"], "headers": ["Authorization"] },
+          "response_schema": "CustomerDto",
+          "status_codes": [201, 400, 401, 403, 500],
+          "validation": "UNVERIFIED",
+          "provenance": "llm",
+          "confidence": 0.6,
+          "request_fields": [
+            { "name": "firstName", "type": "string", "required": true },
+            { "name": "lastName", "type": "string", "required": true },
+            { "name": "email", "type": "string", "description": "Format RFC 5322", "required": true },
+            { "name": "segment", "type": "enum[RETAIL,PREMIUM]", "required": false }
+          ],
+          "response_fields": [
+            { "name": "id", "type": "UUID", "required": true },
+            { "name": "createdAt", "type": "ISO-8601", "required": true }
+          ],
+          "data_access": [
+            { "component_id": "db_postgres", "resource": "customers", "operation": "INSERT", "provenance": "manual", "confidence": 1 },
+            { "component_id": "db_postgres", "resource": "customer_events", "operation": "INSERT", "note": "Évènement d'audit CustomerCreated", "provenance": "manual", "confidence": 1 },
+            { "component_id": "mq_kafka", "resource": "customer.events", "operation": "PUBLISH", "note": "Évènement CustomerCreated", "provenance": "auto", "confidence": 0.9 },
+            { "component_id": "queue_jobs", "resource": "welcome-email", "operation": "ENQUEUE", "provenance": "llm", "confidence": 0.6 }
+          ]
+        },
+        {
+          "path": "/api/v1/customers/{id}",
+          "method": "PATCH",
+          "description": "Mettre à jour partiellement un client et invalider le cache.",
+          "authenticated": true,
+          "params": { "query": [], "path": ["id"], "body": ["PatchCustomerRequest"], "headers": ["Authorization"] },
+          "response_schema": "CustomerDto",
+          "status_codes": [200, 400, 401, 403, 404, 500],
+          "validation": "VALID",
+          "provenance": "manual",
+          "confidence": 1,
+          "request_fields": [
+            { "name": "email", "type": "string", "required": false },
+            { "name": "segment", "type": "enum[RETAIL,PREMIUM]", "required": false }
+          ],
+          "data_access": [
+            { "component_id": "db_postgres", "resource": "customers", "operation": "UPDATE", "provenance": "manual", "confidence": 1 },
+            { "component_id": "cache_redis", "resource": "customer::{id}", "operation": "EVICT", "provenance": "auto", "confidence": 0.9 }
+          ]
+        }
+      ],
+      "deployment": {
+        "platform": "Kubernetes",
+        "region": "eu-west-3",
+        "ci_cd": "GitLab CI",
+        "module_federation": false,
+        "containerized": true,
+        "orchestration": "Kubernetes",
+        "scaling": "HPA 2-10 répliques (CPU 70%)",
+        "note": "Probes readiness/liveness sur /api/v1/health."
+      }
+    },
+    {
+      "id": "service_pdf",
+      "label": "PDF Render Service",
+      "type": "service",
+      "layer": "Backend",
+      "technology": "Node.js 22 + Puppeteer 23",
+      "url": "${PDF_SERVICE_URL}",
+      "port": 9090,
+      "description": "Service interne de rendu de documents PDF (relevés, attestations) appelé en synchrone par la Core API.",
+      "owner": "John Smith",
+      "team": "Squad Core",
+      "criticality": "medium",
+      "environment": "production",
+      "provenance": "manual",
+      "confidence": 1,
+      "consumed_via": "REST/HTTPS",
+      "used_by": ["backend_core_api"],
+      "endpoints": [
+        {
+          "path": "/render/customer-statement",
+          "method": "POST",
+          "description": "Génère un relevé client en PDF.",
+          "authenticated": true,
+          "params": { "query": [], "path": [], "body": ["StatementRequest"], "headers": ["Authorization"] },
+          "response_schema": "application/pdf",
+          "status_codes": [200, 400, 500],
+          "validation": "VALID",
+          "provenance": "manual",
+          "confidence": 1
+        }
+      ],
+      "deployment": { "platform": "Kubernetes", "ci_cd": "GitLab CI", "containerized": true }
+    },
+    {
+      "id": "batch_nightly",
+      "label": "Nightly Reconciliation Batch",
+      "type": "batch",
+      "layer": "Backend",
+      "technology": "Spring Batch 5.2",
+      "description": "Job planifié nocturne de réconciliation des clients et de purge des données expirées.",
+      "owner": "Ops Team",
+      "team": "Squad Data",
+      "criticality": "medium",
+      "environment": "production",
+      "provenance": "manual",
+      "confidence": 1,
+      "note": "Déclenché à 02:00 UTC via CronJob Kubernetes.",
+      "deployment": { "platform": "Kubernetes", "ci_cd": "GitLab CI", "containerized": true, "orchestration": "Kubernetes CronJob" }
+    },
+    {
+      "id": "etl_pipeline",
+      "label": "Analytics ETL",
+      "type": "etl",
+      "layer": "Backend",
+      "technology": "Apache Airflow 2.10 + dbt 1.8",
+      "description": "Pipeline ETL qui extrait les données clients vers l'entrepôt analytique.",
+      "owner": "Data Eng",
+      "team": "Squad Data",
+      "criticality": "low",
+      "environment": "production",
+      "provenance": "llm",
+      "confidence": 0.7,
+      "consumed_via": "JDBC + S3",
+      "note": "DAG quotidien orchestré par Airflow."
+    },
+    {
+      "id": "db_postgres",
+      "label": "PostgreSQL",
+      "type": "db",
+      "layer": "Data",
+      "technology": "PostgreSQL 16",
+      "url": "${POSTGRES_URL}",
+      "port": 5432,
+      "description": "Base de données relationnelle principale du domaine client.",
+      "owner": "Ops Team",
+      "team": "Squad Data",
+      "criticality": "critical",
+      "environment": "production",
+      "provenance": "manual",
+      "confidence": 1,
+      "consumed_via": "Spring Data JPA / HikariCP",
+      "tables": [
+        { "name": "customers", "purpose": "Données d'identité et de segmentation des clients", "note": "Soft-delete via colonne deleted_at" },
+        { "name": "customer_events", "purpose": "Journal d'évènements clients (audit)" },
+        { "name": "segments", "purpose": "Référentiel des segments commerciaux" }
+      ]
+    },
+    {
+      "id": "cache_redis",
+      "label": "Redis Cache",
+      "type": "cache",
+      "layer": "Data",
+      "technology": "Redis 7.2 (Sentinel)",
+      "url": "${REDIS_URL}",
+      "port": 6379,
+      "description": "Cache applicatif des fiches clients pour réduire la charge sur PostgreSQL.",
+      "owner": "Ops Team",
+      "team": "Squad Data",
+      "criticality": "high",
+      "environment": "production",
+      "provenance": "auto",
+      "confidence": 0.9,
+      "consumed_via": "Spring Cache + Lettuce",
+      "cached_data": [
+        {
+          "endpoint": "/api/v1/customers/{id}",
+          "key_pattern": "customer::{id}",
+          "ttl": "3600000ms",
+          "purpose": "Fiche client mise en cache par identifiant, invalidée à la mise à jour"
+        }
+      ]
+    },
+    {
+      "id": "queue_jobs",
+      "label": "Jobs Queue",
+      "type": "queue",
+      "layer": "Data",
+      "technology": "Redis Streams / Bull 5",
+      "url": "${QUEUE_URL}",
+      "description": "File de tâches asynchrones (envoi d'e-mails, génération de documents).",
+      "owner": "Ops Team",
+      "team": "Squad Core",
+      "criticality": "medium",
+      "environment": "production",
+      "provenance": "llm",
+      "confidence": 0.6,
+      "consumed_via": "Bull producer/consumer"
+    },
+    {
+      "id": "mq_kafka",
+      "label": "Kafka",
+      "type": "mq",
+      "layer": "Data",
+      "technology": "Apache Kafka 3.7",
+      "url": "${KAFKA_BOOTSTRAP}",
+      "description": "Broker d'évènements métier (customer.events) consommé par les pipelines aval.",
+      "owner": "Platform Team",
+      "team": "Squad Data",
+      "criticality": "high",
+      "environment": "production",
+      "provenance": "manual",
+      "confidence": 1,
+      "consumed_via": "Spring Kafka / KafkaTemplate",
+      "note": "Topic producteur : customer.events (3 partitions, replication 3)."
+    },
+    {
+      "id": "iam_keycloak",
+      "label": "Keycloak IAM",
+      "type": "iam",
+      "layer": "External",
+      "technology": "Keycloak 24",
+      "url": "${KEYCLOAK_URL}",
+      "description": "Fournisseur d'identité OIDC émettant les JWT consommés par la Core API.",
+      "owner": "Security Team",
+      "team": "Squad Sécurité",
+      "criticality": "critical",
+      "environment": "production",
+      "provenance": "manual",
+      "confidence": 1,
+      "consumed_via": "OIDC (spring-security-oauth2-resource-server)",
+      "used_by": ["backend_core_api", "mfe_portal"],
+      "endpoints": [
+        { "path": "/realms/{realm}/protocol/openid-connect/token", "method": "POST", "description": "Émission de jeton" },
+        { "path": "/realms/{realm}/protocol/openid-connect/userinfo", "method": "GET", "description": "Profil utilisateur" }
+      ]
+    },
+    {
+      "id": "monitoring_datadog",
+      "label": "Datadog",
+      "type": "monitoring",
+      "layer": "External",
+      "technology": "Datadog Agent + APM",
+      "url": "${DATADOG_URL}",
+      "description": "Observabilité : métriques, traces APM et logs corrélés.",
+      "owner": "SRE",
+      "team": "Squad Plateforme",
+      "criticality": "medium",
+      "environment": "production",
+      "provenance": "auto",
+      "confidence": 0.9,
+      "consumed_via": "dd-trace + OpenTelemetry",
+      "used_by": ["backend_core_api", "service_pdf"]
+    },
+    {
+      "id": "third_party_nba",
+      "label": "Next Best Action API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign + OkHttp)",
+      "url": "${NBA_URL}",
+      "description": "Service tiers de recommandations (Next Best Action) — cartographié séparément dans l'architecture nba-api.",
+      "owner": "Squad NBA",
+      "team": "Squad NBA",
+      "criticality": "medium",
+      "environment": "production",
+      "provenance": "manual",
+      "confidence": 1,
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "external_ref": "nba",
+      "used_by": ["backend_core_api"],
+      "endpoints": [
+        { "path": "/nba/recommendations", "method": "GET", "description": "Recommandations par client", "authenticated": true }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "mfe_portal_to_backend_core_api",
+      "from": "mfe_portal",
+      "to": "backend_core_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Appels REST du portail conseiller vers l'API métier.",
+      "client": "axios 1.7.9",
+      "latency": "~80ms p95",
+      "flow": "MFE → API Gateway → Core API",
+      "endpoint_mappings": [
+        {
+          "frontend_endpoint": "GET /api/v1/customers",
+          "backend_endpoint": "/api/v1/customers",
+          "method": "GET",
+          "frontend_pages": ["/portal/customers"],
+          "purpose": "Lister les clients pour la page de liste.",
+          "query_params": "page, size, search",
+          "status": "✅ MAPPÉ",
+          "authenticated": true
+        },
+        {
+          "frontend_endpoint": "GET /api/v1/customers/{id}",
+          "backend_endpoint": "/api/v1/customers/{id}",
+          "method": "GET",
+          "frontend_pages": ["/portal/customers"],
+          "purpose": "Afficher le détail d'un client.",
+          "path_params": "id",
+          "status": "✅ MAPPÉ",
+          "authenticated": true
+        },
+        {
+          "frontend_endpoint": "POST /api/v1/customers",
+          "backend_endpoint": "/api/v1/customers",
+          "method": "POST",
+          "frontend_pages": ["/portal/customers/new"],
+          "purpose": "Créer un client.",
+          "request_body": "CreateCustomerRequest",
+          "status": "✅ MAPPÉ",
+          "authenticated": true
+        },
+        {
+          "frontend_endpoint": "PATCH /api/v1/customers/{id}",
+          "backend_endpoint": "/api/v1/customers/{id}",
+          "method": "PATCH",
+          "frontend_pages": ["/portal/customers/{id}/edit"],
+          "purpose": "Mettre à jour un client.",
+          "path_params": "id",
+          "request_body": "PatchCustomerRequest",
+          "status": "✅ MAPPÉ",
+          "authenticated": true
+        }
+      ]
+    },
+    {
+      "id": "backend_core_api_to_db_postgres",
+      "from": "backend_core_api",
+      "to": "db_postgres",
+      "protocol": "JDBC",
+      "authenticated": true,
+      "description": "Persistance du domaine client.",
+      "operations": ["SELECT", "INSERT", "UPDATE"],
+      "note": "Pool HikariCP (max 20)."
+    },
+    {
+      "id": "backend_core_api_to_cache_redis",
+      "from": "backend_core_api",
+      "to": "cache_redis",
+      "protocol": "Redis/Sentinel",
+      "authenticated": true,
+      "description": "Cache des fiches clients.",
+      "cache_strategy": "cache-aside",
+      "ttl": "3600000ms",
+      "operations": ["GET", "SET", "EVICT"]
+    },
+    {
+      "id": "backend_core_api_to_mq_kafka",
+      "from": "backend_core_api",
+      "to": "mq_kafka",
+      "protocol": "Kafka/SSL",
+      "authenticated": true,
+      "description": "Publication des évènements clients.",
+      "operations": ["PUBLISH"]
+    },
+    {
+      "id": "backend_core_api_to_queue_jobs",
+      "from": "backend_core_api",
+      "to": "queue_jobs",
+      "protocol": "Redis",
+      "authenticated": true,
+      "description": "Mise en file des tâches asynchrones."
+    },
+    {
+      "id": "backend_core_api_to_service_pdf",
+      "from": "backend_core_api",
+      "to": "service_pdf",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Rendu de documents PDF à la demande.",
+      "endpoints": [
+        { "frontend_call": "POST /render/customer-statement", "backend_endpoint": "/render/customer-statement", "method": "POST", "description": "Relevé client" }
+      ]
+    },
+    {
+      "id": "backend_core_api_to_iam_keycloak",
+      "from": "backend_core_api",
+      "to": "iam_keycloak",
+      "protocol": "OIDC/HTTPS",
+      "authenticated": true,
+      "description": "Validation des JWT et introspection."
+    },
+    {
+      "id": "backend_core_api_to_monitoring_datadog",
+      "from": "backend_core_api",
+      "to": "monitoring_datadog",
+      "protocol": "HTTPS",
+      "authenticated": true,
+      "description": "Export des métriques, traces et logs."
+    },
+    {
+      "id": "backend_core_api_to_third_party_nba",
+      "from": "backend_core_api",
+      "to": "third_party_nba",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Enrichissement des fiches clients par les recommandations NBA.",
+      "client": "OpenFeign"
+    },
+    {
+      "id": "mfe_portal_to_iam_keycloak",
+      "from": "mfe_portal",
+      "to": "iam_keycloak",
+      "protocol": "OIDC/HTTPS",
+      "authenticated": false,
+      "description": "Authentification de l'utilisateur (Authorization Code + PKCE)."
+    },
+    {
+      "id": "batch_nightly_to_db_postgres",
+      "from": "batch_nightly",
+      "to": "db_postgres",
+      "protocol": "JDBC",
+      "authenticated": true,
+      "description": "Réconciliation et purge nocturnes.",
+      "operations": ["SELECT", "DELETE"]
+    },
+    {
+      "id": "etl_pipeline_to_db_postgres",
+      "from": "etl_pipeline",
+      "to": "db_postgres",
+      "protocol": "JDBC",
+      "authenticated": true,
+      "description": "Extraction des données clients vers l'entrepôt analytique.",
+      "operations": ["SELECT"]
+    }
+  ],
+  "flow_summary": {
+    "user_flow": "Le conseiller s'authentifie via Keycloak depuis le Portal MFE, consulte et gère les clients via la Core API. La Core API lit/écrit PostgreSQL, met en cache les fiches dans Redis, publie les évènements dans Kafka, met en file les tâches asynchrones, enrichit via le tiers NBA et rend des PDF via un service interne. Batch et ETL exploitent la base en aval. Tout est observé par Datadog.",
+    "technologies_count": 14,
+    "backend_endpoints": 6,
+    "frontend_routes": 3,
+    "external_services": 3
+  },
+  "warnings": [
+    {
+      "severity": "INFO",
+      "message": "L'endpoint POST /api/v1/customers est marqué UNVERIFIED (provenance LLM).",
+      "component": "backend_core_api",
+      "suggestion": "Vérifier la validation du body côté contrôleur puis passer validation à VALID."
+    }
+  ],
+  "validation_checklist": {
+    "endpoints": "✅ Tous les endpoints documentés (path, method, params, contrat)",
+    "data_access": "✅ data_access tracé pour chaque endpoint",
+    "connections": "✅ Mappings frontend ↔ backend complets",
+    "authentication": "✅ Schéma d'auth renseigné",
+    "organisation": "✅ owner / team / criticality / environment renseignés"
+  },
+  "next_steps": [
+    "Confirmer le contrat de PatchCustomerRequest avec l'équipe Core.",
+    "Vérifier la validation du body sur POST /api/v1/customers (warning INFO).",
+    "Documenter les SLA des appels vers le tiers NBA."
+  ]
+}

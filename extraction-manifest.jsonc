@@ -1,0 +1,800 @@
+// ==============================================================================
+// ArchitectViz — Manifeste d'extraction (auto-extraction & merge idempotent)
+// ==============================================================================
+//
+// RÔLE
+// ----
+// Pour chaque section du schéma ArchitectViz (`src/types.ts` + `_empty.jsonc`),
+// ce manifeste déclare :
+//   • purpose             — définition métier du champ
+//   • sources             — fichiers/chemins où chercher la valeur
+//   • extractor           — parseur déterministe (à exécuter en premier)
+//   • extractor_rules     — règles utilisées par l'extracteur
+//   • ai_prompt_ref       — pointeur vers le prompt IA (fallback / champs flous)
+//   • ai_prompt_hint      — précision sémantique pour l'IA
+//   • validation          — JSON-Schema-like (type, enum, pattern, required…)
+//   • merge               — stratégie de fusion avec une donnée existante
+//   • merge.identity      — clé(s) servant à dédupliquer les listes
+//
+// PIPELINE
+// --------
+// 1. Pour une nouvelle architecture, exécuter les sections dans l'ordre `order`.
+// 2. Chaque section est une passe indépendante (~6-8 passes pour un SI complet),
+//    ce qui évite de demander tout en une seule fois à une IA.
+// 3. Lors d'une mise à jour, la fusion est strictement gouvernée par `merge` :
+//    le pipeline produit toujours le même résultat pour les mêmes entrées
+//    (idempotence) et ne crée jamais de doublons grâce à `merge.identity`.
+//
+// PRINCIPES DE FUSION
+// -------------------
+//   • replace             → la nouvelle valeur écrase l'ancienne
+//   • preserve-manual     → l'ancienne valeur prévaut (champ rédigé à la main)
+//   • prefer-non-empty    → l'ancienne valeur prévaut si non vide / non "À confirmer"
+//   • dedupe-append       → liste : ajouter sans doublon (égalité de valeur)
+//   • dedupe-by-identity  → liste d'objets : merge par clé(s) déclarée(s)
+//   • compute             → recalculé depuis l'état fusionné (ex. flow_summary)
+//   • bump                → version SemVer bumpée selon l'ampleur du diff
+// ==============================================================================
+{
+  "$manifest": "ArchitectViz Extraction Manifest",
+  "version": "1.0.0",
+  "applies_to": "src/architectures/*.{json,jsonc}",
+  "schema_ref": "src/types.ts",
+  "template_ref": "src/architectures/_empty.jsonc",
+
+  // ── Réglages globaux ──────────────────────────────────────────────────────
+  "global": {
+    // Valeur placeholder utilisée quand une info est manquante.
+    // Aucun champ ne doit valoir `null` — toujours utiliser ce placeholder.
+    "missing_placeholder": "À confirmer",
+
+    // Quand l'extraction trouve une valeur et que le champ existant vaut
+    // exactement le placeholder, on écrase. Sinon on applique `merge`.
+    "overwrite_placeholder": true,
+
+    // Tout champ qui reste au placeholder après extraction génère un warning INFO.
+    "warn_on_placeholder": true,
+
+    // Champs métier toujours préservés (rédigés à la main, jamais auto-générés).
+    // S'applique en plus de la stratégie `merge` déclarée par champ.
+    "manual_fields_global": [
+      "$.description",
+      "$.components[*].description",
+      "$.components[*].note",
+      "$.components[*].deployment.note",
+      "$.components[*].authentication.note",
+      "$.components[*].cached_data[*].purpose",
+      "$.connections[*].description",
+      "$.connections[*].note",
+      "$.connections[*].flow",
+      "$.layers[*].description"
+    ],
+
+    // Seuil de confiance par défaut pour valider une valeur produite par l'IA.
+    "ai_confidence_threshold_default": 0.8
+  },
+
+  // ── Sections d'extraction (ordre = ordre des passes) ──────────────────────
+  "sections": [
+
+    // ── 1. IDENTITÉ ────────────────────────────────────────────────────────
+    {
+      "id": "identity",
+      "order": 1,
+      "title": "Identité du SI",
+      "scope": "Champs top-level : nom, type, version, description",
+      "extraction_pass": "single",
+      "ai_prompt_ref": "prompts/sections/identity.md",
+      "fields": {
+        "architecture": {
+          "purpose": "Nom court du SI affiché dans le sélecteur et le canvas",
+          "sources": [
+            { "file": "package.json", "json_path": "$.name" },
+            { "file": "pom.xml",      "xpath": "//project/artifactId" },
+            { "file": "pyproject.toml", "toml_path": "tool.poetry.name | project.name" },
+            { "file": "README.md",    "rule": "premier titre H1" }
+          ],
+          "extractor": "project-name-detector",
+          "ai_prompt_hint": "Nom métier court (ex: 'CEGeC', 'Portail Client'), pas le nom technique du repo",
+          "validation": {
+            "type": "string",
+            "required": true,
+            "min_length": 2,
+            "max_length": 60
+          },
+          "merge": "preserve-manual"
+        },
+        "type": {
+          "purpose": "Type global du système",
+          "sources": [{ "rule": "déduit de la composition de components[]" }],
+          "extractor": "system-type-inferer",
+          "extractor_rules": [
+            "présence de components[].type == 'frontend' uniquement → FRONTEND",
+            "présence backend uniquement → BACKEND",
+            "frontend + backend → FULLSTACK",
+            "≥ 3 components backend distincts → MICROSERVICES",
+            "présence etl/batch dominante → DATA",
+            "sinon → OTHER"
+          ],
+          "validation": {
+            "type": "string",
+            "required": true,
+            "enum": ["FULLSTACK", "BACKEND", "FRONTEND", "MICROSERVICES", "MONOLITH", "DATA", "OTHER"]
+          },
+          "merge": "compute"
+        },
+        "version": {
+          "purpose": "Version SemVer du document de cartographie",
+          "sources": [],
+          "validation": {
+            "type": "string",
+            "required": true,
+            "pattern": "^\\d+\\.\\d+\\.\\d+$"
+          },
+          "merge": "bump",
+          "merge_rules": {
+            "patch": "Mises à jour de versions de libs, corrections de descriptions, 1-2 endpoints",
+            "minor": "Nouveau composant, nouvelle connexion, nouveau layer",
+            "major": "Changement de type global, refonte d'auth, refonte topologique"
+          },
+          "default_on_create": "0.1.0"
+        },
+        "lastUpdated": {
+          "purpose": "Date ISO de dernière mise à jour",
+          "extractor": "today-iso-date",
+          "validation": {
+            "type": "string",
+            "required": true,
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "merge": "replace-with-today"
+        },
+        "description": {
+          "purpose": "Description fonctionnelle 1-2 phrases (à quoi ça sert, pas comment)",
+          "sources": [
+            { "file": "package.json", "json_path": "$.description" },
+            { "file": "pom.xml",      "xpath": "//project/description" },
+            { "file": "README.md",    "rule": "premier paragraphe après H1" }
+          ],
+          "extractor": "first-meaningful-description",
+          "ai_prompt_hint": "Reformuler en 1-2 phrases métier. Ne PAS mentionner la stack technique.",
+          "validation": { "type": "string", "required": true, "min_length": 10, "max_length": 400 },
+          "merge": "preserve-manual"
+        }
+      }
+    },
+
+    // ── 2. LAYERS ──────────────────────────────────────────────────────────
+    {
+      "id": "layers",
+      "order": 2,
+      "title": "Couches",
+      "scope": "Structure visuelle du canvas (légende, couleurs)",
+      "json_path": "$.layers",
+      "extraction_pass": "static-default",
+      "ai_prompt_ref": "prompts/sections/layers.md",
+      "static_default": [
+        { "name": "Frontend", "color": "#E3F2FD", "description": "Couche présentation — interfaces utilisateur, SPA, MFE" },
+        { "name": "Backend",  "color": "#FFF3E0", "description": "Couche métier — API REST, services, traitements" },
+        { "name": "Data",     "color": "#F3E5F5", "description": "Couche persistance — bases de données, cache, files" },
+        { "name": "External", "color": "#E8F5E9", "description": "Services externes / tiers — APIs partenaires, IAM, monitoring" }
+      ],
+      "merge": { "strategy": "dedupe-by-identity", "identity": ["name"] },
+      "item_fields": {
+        "name":        { "validation": { "type": "string", "required": true }, "merge": "preserve-manual" },
+        "color":       { "validation": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }, "merge": "preserve-manual" },
+        "description": { "validation": { "type": "string", "required": true }, "merge": "preserve-manual" }
+      }
+    },
+
+    // ── 3. COMPOSANTS FRONTEND ─────────────────────────────────────────────
+    {
+      "id": "components_frontend",
+      "order": 3,
+      "title": "Composants frontend",
+      "scope": "Composants où type='frontend' (SPA, MFE, PWA)",
+      "json_path": "$.components[?(@.type=='frontend')]",
+      "extraction_pass": "per-frontend-project",
+      "ai_prompt_ref": "prompts/sections/components-frontend.md",
+      "sources_default": [
+        "package.json",
+        "vite.config.*", "webpack.config.*", "next.config.*", "angular.json",
+        "src/**/*.{ts,tsx,js,jsx,vue,svelte}",
+        "pages/**", "app/**"
+      ],
+      "merge": { "strategy": "dedupe-by-identity", "identity": ["id"] },
+      "item_fields": {
+        "id": {
+          "purpose": "Identifiant unique snake_case (référencé dans connections.from/to)",
+          "extractor": "slugify(package.json:name)",
+          "validation": { "type": "string", "required": true, "pattern": "^[a-z0-9_-]+$" },
+          "merge": "preserve-manual"
+        },
+        "label": {
+          "purpose": "Libellé affiché sur le nœud du canvas",
+          "extractor": "humanize(id) | package.json:displayName",
+          "validation": { "type": "string", "required": true },
+          "merge": "preserve-manual"
+        },
+        "type":  { "validation": { "type": "string", "enum": ["frontend"], "required": true }, "merge": "replace" },
+        "layer": { "validation": { "type": "string", "required": true, "refers_to": "$.layers[].name" }, "merge": "preserve-manual" },
+
+        "technology": {
+          "purpose": "Stack technique complète avec versions",
+          "sources": [{ "file": "package.json", "json_path": "$.dependencies" }],
+          "extractor": "frontend-stack-detector",
+          "extractor_rules": [
+            "react|vue|@angular/core|svelte|next → framework + version (sans ^ ni ~)",
+            "vite|webpack|turbopack|rspack → bundler + version",
+            "tailwindcss|@mui/*|antd|@chakra-ui/* → UI framework",
+            "format strict : '<lib1> X.Y + <lib2> A.B'"
+          ],
+          "ai_prompt_hint": "Confirmer par au moins un import dans src/",
+          "validation": { "type": "string", "required": true },
+          "merge": "replace"
+        },
+
+        "url": {
+          "sources": [
+            { "file": ".env*",    "rule": "VITE_APP_URL | NEXT_PUBLIC_URL" },
+            { "file": "README.md","rule": "section déploiement" }
+          ],
+          "validation": { "type": "string" },
+          "merge": "preserve-manual"
+        },
+
+        "build_tool": {
+          "sources": [
+            { "file": "package.json", "json_path": "$.scripts.build" },
+            { "file": "vite.config.*|webpack.config.*|next.config.*", "rule": "config présence" }
+          ],
+          "extractor": "build-tool-detector",
+          "validation": { "type": "string" },
+          "merge": "replace"
+        },
+
+        "state_management": {
+          "sources": [{ "file": "package.json", "json_path": "$.dependencies" }],
+          "extractor": "state-mgmt-detector",
+          "extractor_rules": [
+            "@tanstack/react-query | swr → server-state",
+            "redux | zustand | jotai | mobx | recoil | pinia → client-state",
+            "react-hook-form | formik | vee-validate → form-state",
+            "format : 'lib X.Y (rôle) + lib A.B (rôle)'"
+          ],
+          "validation": { "type": "string" },
+          "merge": "replace"
+        },
+
+        "routes": {
+          "purpose": "Routes/pages exposées par le frontend",
+          "sources_by_framework": {
+            "react-router":  ["src/**/*Routes*.{ts,tsx}", "grep:'<Route path='|'createBrowserRouter'|'useRoutes'"],
+            "next-pages":    ["pages/**/*.{ts,tsx,js,jsx}"],
+            "next-app":      ["app/**/page.{ts,tsx,js,jsx}"],
+            "vue-router":    ["src/router/**/*"],
+            "angular-router":["**/*-routing.module.ts"]
+          },
+          "extractor": "routes-by-framework",
+          "ai_prompt_ref": "prompts/sections/components-frontend.md#routes",
+          "merge": { "strategy": "dedupe-by-identity", "identity": ["path"] },
+          "item_fields": {
+            "path":  { "validation": { "type": "string", "required": true }, "merge": "replace" },
+            "label": { "validation": { "type": "string", "required": true }, "merge": "preserve-manual" },
+            "authenticated": {
+              "extractor": "route-guard-detector",
+              "extractor_rules": [
+                "<ProtectedRoute>, AuthGuard, middleware, gateway matcher → true",
+                "absence de guard sur la route → false"
+              ],
+              "validation": { "type": "boolean", "required": true },
+              "merge": "replace"
+            },
+            "description": {
+              "ai_prompt_hint": "Déduire du JSX racine — 1 ligne fonctionnelle",
+              "validation": { "type": "string" },
+              "merge": "preserve-manual"
+            },
+            "api_calls": {
+              "extractor": "http-calls-grep",
+              "extractor_rules": [
+                "fetch(...), axios.*, useQuery, useMutation, openapi-fetch",
+                "format strict : 'METHOD /endpoint' (ex: 'GET /api/v1/items')"
+              ],
+              "validation": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /.+" }
+              },
+              "merge": { "strategy": "dedupe-append" }
+            }
+          }
+        },
+
+        "key_dependencies": {
+          "extractor": "key-deps-detector",
+          "extractor_rules": [
+            "UI kits, HTTP clients, validation libs, auth libs",
+            "format strict : '<lib> X.Y.Z' (sans ^ ni ~)"
+          ],
+          "validation": { "type": "array", "items": { "type": "string", "pattern": "^.+ \\d+\\." } },
+          "merge": { "strategy": "dedupe-append" }
+        },
+
+        "deployment": {
+          "sources": [
+            { "file": "Dockerfile",          "rule": "présence → containerized:true" },
+            { "file": ".gitlab-ci.yml",      "rule": "→ ci_cd:'GitLab CI'" },
+            { "file": ".github/workflows/*", "rule": "→ ci_cd:'GitHub Actions'" },
+            { "file": "Jenkinsfile",         "rule": "→ ci_cd:'Jenkins'" },
+            { "file": "helm/|k8s/|manifests/", "rule": "→ orchestration:'Kubernetes'" }
+          ],
+          "extractor": "deployment-detector",
+          "merge": "deep-merge",
+          "sub_fields": {
+            "platform":      { "merge": "prefer-non-empty" },
+            "ci_cd":         { "merge": "replace" },
+            "containerized": { "merge": "replace" },
+            "orchestration": { "merge": "replace" },
+            "note":          { "merge": "preserve-manual" }
+          }
+        }
+      }
+    },
+
+    // ── 4. COMPOSANTS BACKEND ──────────────────────────────────────────────
+    {
+      "id": "components_backend",
+      "order": 4,
+      "title": "Composants backend",
+      "scope": "Composants où type='backend' (API REST, gRPC, BFF)",
+      "json_path": "$.components[?(@.type=='backend')]",
+      "extraction_pass": "per-backend-project",
+      "ai_prompt_ref": "prompts/sections/components-backend.md",
+      "sources_default": [
+        "pom.xml", "build.gradle*", "package.json", "pyproject.toml", "requirements.txt",
+        "go.mod", "*.csproj",
+        "src/**/*.{java,kt,ts,js,py,go,cs}",
+        "application*.yml", "application*.properties"
+      ],
+      "merge": { "strategy": "dedupe-by-identity", "identity": ["id"] },
+      "item_fields": {
+        "id":    { "validation": { "type": "string", "required": true, "pattern": "^[a-z0-9_-]+$" }, "merge": "preserve-manual" },
+        "label": { "validation": { "type": "string", "required": true }, "merge": "preserve-manual" },
+        "type":  { "validation": { "type": "string", "enum": ["backend"], "required": true }, "merge": "replace" },
+        "layer": { "validation": { "type": "string", "required": true, "refers_to": "$.layers[].name" }, "merge": "preserve-manual" },
+
+        "technology": {
+          "extractor": "backend-stack-detector",
+          "extractor_rules": [
+            "pom.xml<parent><artifactId>spring-boot-starter-parent → 'Spring Boot X.Y'",
+            "build.gradle:springBoot.version → 'Spring Boot X.Y'",
+            "package.json deps: express|@nestjs/core|fastify|koa|hono",
+            "pyproject.toml: fastapi|django|flask",
+            "go.mod + routers: chi|gin|echo|gorilla/mux",
+            "*.csproj <TargetFramework> + Program.cs middlewares",
+            "format : '<runtime version> + <framework> X.Y + <key libs>'"
+          ],
+          "validation": { "type": "string", "required": true },
+          "merge": "replace"
+        },
+
+        "port": {
+          "sources": [
+            { "file": "application*.yml", "yaml_path": "server.port" },
+            { "file": "application.properties", "rule": "server.port=" },
+            { "file": ".env*", "rule": "PORT=" },
+            { "file": "src/**/main.{ts,js,py,go}", "rule": "listen()/run() arg" }
+          ],
+          "extractor": "port-detector",
+          "validation": { "type": "integer", "minimum": 1, "maximum": 65535 },
+          "merge": "replace"
+        },
+
+        "authentication": {
+          "purpose": "Mécanisme d'auth porté par ce backend",
+          "ai_prompt_ref": "prompts/sections/components-backend.md#authentication",
+          "sources": [
+            { "rule": "SecurityFilterChain, WebSecurityConfigurerAdapter, @PreAuthorize" },
+            { "rule": "application.yml: spring.security.oauth2.*" },
+            { "rule": "middlewares JWT (jsonwebtoken, jwks-rsa, passport)" }
+          ],
+          "merge": "deep-merge",
+          "sub_fields": {
+            "type":               { "validation": { "type": "string" }, "merge": "replace" },
+            "provider":           { "validation": { "type": "string" }, "merge": "prefer-non-empty" },
+            "token_format":       { "validation": { "type": "string" }, "merge": "replace" },
+            "token_expiry":       { "validation": { "type": "string" }, "merge": "prefer-non-empty" },
+            "roles_permissions":  { "validation": { "type": "string" }, "merge": "prefer-non-empty" },
+            "note":               { "validation": { "type": "string" }, "merge": "preserve-manual" }
+          }
+        },
+
+        "endpoints": {
+          "purpose": "Endpoints HTTP exposés",
+          "ai_prompt_ref": "prompts/sections/components-backend.md#endpoints",
+          "sources_by_framework": {
+            "spring-mvc":  ["grep:'@RestController|@RequestMapping|@GetMapping|@PostMapping|@PutMapping|@PatchMapping|@DeleteMapping'"],
+            "spring-jaxrs":["grep:'@Path|@GET|@POST|@PUT|@DELETE'"],
+            "nestjs":      ["grep:'@Controller|@Get|@Post|@Put|@Patch|@Delete'"],
+            "express":     ["grep:'app\\.(get|post|put|patch|delete)|router\\.(get|post|put|patch|delete)'"],
+            "fastapi":     ["grep:'@app\\.(get|post|put|patch|delete)|@router\\.(get|post|put|patch|delete)'"],
+            "go":          ["grep:'r\\.(GET|POST|PUT|PATCH|DELETE)|http\\.HandleFunc'"]
+          },
+          "extractor": "endpoints-by-framework",
+          "merge": { "strategy": "dedupe-by-identity", "identity": ["method", "path"] },
+          "item_fields": {
+            "path":   { "validation": { "type": "string", "required": true, "pattern": "^/" }, "merge": "replace" },
+            "method": { "validation": { "type": "string", "required": true, "enum": ["GET","POST","PUT","PATCH","DELETE","HEAD","OPTIONS"] }, "merge": "replace" },
+            "authenticated": {
+              "extractor_rules": [
+                "classe ou méthode protégée par Spring Security (sauf permitAll) → true",
+                "@UseGuards, @Authenticated, @login_required, middleware d'auth → true"
+              ],
+              "validation": { "type": "boolean" },
+              "merge": "replace"
+            },
+            "params": {
+              "extractor_rules": [
+                "@RequestParam → query",
+                "@PathVariable → path",
+                "@RequestBody → body",
+                "@RequestHeader → headers"
+              ],
+              "validation": { "type": "object" },
+              "merge": "deep-merge"
+            },
+            "response_schema": { "validation": { "type": "string" }, "merge": "replace" },
+            "status_codes":    { "validation": { "type": "array", "items": { "type": "integer" } }, "merge": { "strategy": "dedupe-append" } },
+            "description":     { "validation": { "type": "string" }, "merge": "preserve-manual" },
+            "validation":      { "validation": { "type": "string", "enum": ["✅ MAPPÉ", "⚠️ À VÉRIFIER", "❌ NON MAPPÉ", "✅ VALID", "⚠️ NON VALIDÉ"] }, "merge": "compute" },
+            "mapped_from_frontend": { "validation": { "type": "string" }, "merge": "compute" },
+
+            "data_access": {
+              "purpose": "Ressources externes consommées par cet endpoint — chaque entrée décrit un (composant cible, ressource, opération). Permet l'impact analysis et le data lineage.",
+              "ai_prompt_ref": "prompts/sections/components-backend.md#data_access",
+              "extractor_rules": [
+                "Spring + JPA : chercher les @Repository injectés via le service appelé par cet endpoint ; pour chaque repository, lister les @Entity / @Table → component_id = composant DB, resource = nom de table, operation = SELECT/INSERT/UPDATE/DELETE selon la méthode appelée",
+                "Spring + MyBatis : *Mapper.xml ou annotations @Select/@Insert/@Update/@Delete → table + opération",
+                "Spring @Cacheable('name') sur la chaîne d'appel : component_id = cache, resource = key pattern, operation = GET/SET",
+                "@FeignClient appelé : component_id = third-party, resource = path appelé, operation = METHOD HTTP",
+                "@KafkaListener/KafkaTemplate.send : component_id = mq, resource = topic, operation = PUBLISH/SUBSCRIBE",
+                "NestJS + TypeORM/Prisma : @InjectRepository(Entity) ou prisma.<model>.<verb>() → entité + opération",
+                "FastAPI + SQLAlchemy : Session.query(Entity) / session.execute(stmt) → entité + opération",
+                "Raw SQL (toutes stacks) : grep 'SELECT ... FROM <table>' / 'INSERT INTO <table>' dans le code appelé"
+              ],
+              "merge": { "strategy": "dedupe-by-identity", "identity": ["component_id", "resource", "operation"] },
+              "item_fields": {
+                "component_id": {
+                  "purpose": "ID du composant cible (db, cache, mq, third-party)",
+                  "validation": { "type": "string", "required": true, "refers_to": "$.components[].id", "pattern": "^[a-z0-9_-]+$" },
+                  "merge": "replace"
+                },
+                "resource": {
+                  "purpose": "Ressource touchée : nom de table SQL, key pattern Redis, topic Kafka, path REST",
+                  "validation": { "type": "string", "required": true },
+                  "merge": "replace"
+                },
+                "operation": {
+                  "purpose": "Opération effectuée : SELECT/INSERT/UPDATE/DELETE pour SQL, GET/SET/DEL pour cache, PUBLISH/SUBSCRIBE pour mq, METHOD pour REST",
+                  "validation": { "type": "string", "required": true },
+                  "merge": "replace"
+                },
+                "note": {
+                  "purpose": "Note libre (volume, fréquence, contraintes)",
+                  "validation": { "type": "string" },
+                  "merge": "preserve-manual"
+                }
+              }
+            }
+          }
+        },
+
+        "deployment": {
+          "sources": [
+            { "file": "Dockerfile",          "rule": "→ containerized:true, platform:'Docker'" },
+            { "file": ".gitlab-ci.yml|.github/workflows/*|Jenkinsfile", "rule": "→ ci_cd" },
+            { "file": "helm/|k8s/|manifests/", "rule": "→ orchestration:'Kubernetes'" },
+            { "file": "application-prod.yml", "rule": "→ region, scaling" }
+          ],
+          "extractor": "deployment-detector",
+          "merge": "deep-merge"
+        }
+      }
+    },
+
+    // ── 5. COMPOSANTS DATA (db, cache, queue, mq) ──────────────────────────
+    {
+      "id": "components_data",
+      "order": 5,
+      "title": "Composants persistance & messaging",
+      "scope": "Composants où type ∈ {db, cache, queue, mq, etl, batch}",
+      "json_path": "$.components[?(@.layer=='Data')]",
+      "extraction_pass": "per-backend-project",
+      "ai_prompt_ref": "prompts/sections/components-data.md",
+      "merge": { "strategy": "dedupe-by-identity", "identity": ["id"] },
+      "detection_rules_by_type": {
+        "db": [
+          "spring.datasource.url, jpa.*, mybatis.*",
+          "prisma/schema.prisma, sequelize, typeorm",
+          "psycopg2, sqlalchemy, Django DATABASES",
+          "go-pg, gorm, sqlx, pgx"
+        ],
+        "cache": [
+          "spring-boot-starter-data-redis, RedisTemplate, @Cacheable",
+          "ioredis, node-redis, cachemanager",
+          "memcached, hazelcast"
+        ],
+        "queue": [
+          "AWS SQS, Google Pub/Sub, Azure Service Bus",
+          "BullMQ, Bee-Queue, node-cron jobs"
+        ],
+        "mq": [
+          "Kafka : @KafkaListener, KafkaTemplate, spring.kafka.*",
+          "RabbitMQ : @RabbitListener, RabbitTemplate, amqp",
+          "NATS, EventBridge"
+        ]
+      },
+      "item_fields": {
+        "id":    { "validation": { "type": "string", "required": true, "pattern": "^[a-z0-9_-]+$" }, "merge": "preserve-manual" },
+        "label": { "validation": { "type": "string", "required": true }, "merge": "preserve-manual" },
+        "type":  { "validation": { "type": "string", "enum": ["db","cache","queue","mq","etl","batch"], "required": true }, "merge": "replace" },
+        "layer": { "validation": { "type": "string", "required": true }, "merge": "preserve-manual" },
+        "technology":   { "validation": { "type": "string", "required": true }, "merge": "replace" },
+        "url":          { "validation": { "type": "string" }, "merge": "preserve-manual" },
+        "port":         { "validation": { "type": "integer", "minimum": 1, "maximum": 65535 }, "merge": "replace" },
+        "consumed_via": { "validation": { "type": "string" }, "merge": "replace" },
+        "cached_data": {
+          "merge": { "strategy": "dedupe-by-identity", "identity": ["key_pattern"] },
+          "item_fields": {
+            "endpoint":    { "validation": { "type": "string" }, "merge": "replace" },
+            "key_pattern": { "validation": { "type": "string", "required": true }, "merge": "replace" },
+            "ttl":         { "validation": { "type": "string" }, "merge": "replace" },
+            "purpose":     { "validation": { "type": "string" }, "merge": "preserve-manual" }
+          }
+        },
+
+        "tables": {
+          "purpose": "Tables / collections gérées par cette base. À remplir pour les composants de type 'db'. Permet de valider les références depuis endpoints[].data_access[].resource.",
+          "ai_prompt_ref": "prompts/sections/components-data.md#tables",
+          "extractor_rules": [
+            "Spring + JPA : @Entity + @Table(name='...') → name. Si pas de @Table, déduire du nom de classe (snake_case)",
+            "Prisma : schema.prisma → chaque model → table name",
+            "Sequelize/TypeORM : @Entity / sequelize.define(name, ...) → name",
+            "MyBatis : *Mapper.xml → tables référencées dans les <select|insert|update|delete>",
+            "Liquibase/Flyway : SQL migrations → CREATE TABLE / ALTER TABLE",
+            "Pour MongoDB : noms de collections déclarés dans les modèles"
+          ],
+          "merge": { "strategy": "dedupe-by-identity", "identity": ["name"] },
+          "item_fields": {
+            "name": {
+              "purpose": "Nom de la table / collection",
+              "validation": { "type": "string", "required": true, "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$" },
+              "merge": "replace"
+            },
+            "purpose": {
+              "purpose": "Objet métier stocké (1 phrase courte)",
+              "ai_prompt_hint": "Déduire du nom de l'entité et de ses champs. Ex: 'Catalogue produits', 'Hiérarchie des comptes'",
+              "validation": { "type": "string" },
+              "merge": "preserve-manual"
+            },
+            "note": {
+              "purpose": "Note libre (volume estimé, partitionnement, RGPD...)",
+              "validation": { "type": "string" },
+              "merge": "preserve-manual"
+            }
+          }
+        }
+      }
+    },
+
+    // ── 6. COMPOSANTS EXTERNAL (iam, third-party, monitoring) ──────────────
+    {
+      "id": "components_external",
+      "order": 6,
+      "title": "Services externes",
+      "scope": "Composants où type ∈ {iam, third-party, monitoring, service} et layer='External'",
+      "json_path": "$.components[?(@.layer=='External')]",
+      "extraction_pass": "per-backend-project",
+      "ai_prompt_ref": "prompts/sections/components-external.md",
+      "merge": { "strategy": "dedupe-by-identity", "identity": ["id"] },
+      "detection_rules_by_type": {
+        "iam": [
+          "SecurityFilterChain + provider OIDC URL",
+          "Keycloak adapter, Auth0 SDK, Cognito client",
+          "Composant IAM dédié = un component séparé même si auth est aussi dans le backend"
+        ],
+        "third-party": [
+          "Spring : @FeignClient(name='X', url='${...}') → 1 composant par client",
+          "WebClient/RestTemplate avec baseURL → 1 par hôte distinct",
+          "axios.create({ baseURL: process.env.X_API })"
+        ],
+        "monitoring": [
+          "Datadog, Prometheus, OpenTelemetry, Sentry, ELK, New Relic"
+        ]
+      },
+      "item_fields": {
+        "id":           { "validation": { "type": "string", "required": true, "pattern": "^[a-z0-9_-]+$" }, "merge": "preserve-manual" },
+        "label":        { "validation": { "type": "string", "required": true }, "merge": "preserve-manual" },
+        "type":         { "validation": { "type": "string", "enum": ["iam","third-party","monitoring","service"], "required": true }, "merge": "replace" },
+        "layer":        { "validation": { "type": "string", "enum": ["External"], "required": true }, "merge": "replace" },
+        "technology":   { "validation": { "type": "string", "required": true }, "merge": "replace" },
+        "url": {
+          "ai_prompt_hint": "Préférer la variable d'env (${VAR}) plutôt qu'une URL prod réelle",
+          "validation": { "type": "string", "pattern": "^(https?://|\\$\\{)" },
+          "merge": "preserve-manual"
+        },
+        "consumed_via": { "validation": { "type": "string" }, "merge": "replace" },
+        "external_ref": {
+          "purpose": "Si ce service externe est une autre stack cartographiée séparément, son slug canonique (= nom de fichier de SON architecture, ex. 'nba', 'curseur'). Permet de relier automatiquement les architectures entre elles.",
+          "ai_prompt_hint": "Renseigner uniquement si le service correspond à un projet analysé séparément. Utiliser le slug canonique de la stack cible (kebab-case du nom d'architecture).",
+          "extractor": "canonical-stack-slug(label|feign-name)",
+          "validation": { "type": "string", "pattern": "^[a-z0-9_-]+$" },
+          "merge": "preserve-manual"
+        },
+        "endpoints": {
+          "merge": { "strategy": "dedupe-by-identity", "identity": ["method", "path"] },
+          "item_fields": {
+            "path":   { "validation": { "type": "string", "required": true } },
+            "method": { "validation": { "type": "string", "enum": ["GET","POST","PUT","PATCH","DELETE"] } }
+          }
+        },
+        "used_by": {
+          "purpose": "IDs des composants internes qui consomment ce service",
+          "extractor": "callers-from-connections",
+          "validation": { "type": "array", "items": { "type": "string", "refers_to": "$.components[].id" } },
+          "merge": { "strategy": "dedupe-append" }
+        }
+      }
+    },
+
+    // ── 7. CONNEXIONS ──────────────────────────────────────────────────────
+    {
+      "id": "connections",
+      "order": 7,
+      "title": "Connexions",
+      "scope": "Flèches sur le canvas entre deux composants",
+      "json_path": "$.connections",
+      "extraction_pass": "derived-from-components",
+      "ai_prompt_ref": "prompts/sections/connections.md",
+      "derivation_rules": [
+        "Pour chaque component[type=frontend] → 1 connection vers chaque host distinct appelé dans routes[].api_calls",
+        "Pour chaque component[type=backend] → 1 connection vers chaque db, cache, mq, third-party, iam détecté",
+        "Pour chaque @FeignClient/axios.create distinct → 1 connection backend → third-party"
+      ],
+      "merge": { "strategy": "dedupe-by-identity", "identity": ["from", "to", "protocol"] },
+      "item_fields": {
+        "id": {
+          "purpose": "Identifiant unique de la connexion",
+          "extractor": "concat(from, '_to_', to)",
+          "validation": { "type": "string", "required": true, "pattern": "^[a-z0-9_-]+$" },
+          "merge": "preserve-manual"
+        },
+        "from": {
+          "validation": { "type": "string", "required": true, "refers_to": "$.components[].id" },
+          "merge": "replace"
+        },
+        "to": {
+          "validation": { "type": "string", "required": true, "refers_to": "$.components[].id" },
+          "merge": "replace"
+        },
+        "protocol": {
+          "extractor_rules": [
+            "frontend→backend : REST/HTTPS (sauf si gRPC/GraphQL/WebSocket détecté)",
+            "backend→db : JDBC | PostgreSQL Wire | MongoDB Wire selon driver",
+            "backend→cache : Redis | Memcached",
+            "backend→mq : Kafka | AMQP | SQS | Pub/Sub",
+            "backend→iam : OIDC/HTTPS"
+          ],
+          "validation": {
+            "type": "string",
+            "enum_suggested": ["REST/HTTPS","gRPC","GraphQL","WebSocket","Kafka","AMQP","JDBC","Redis","Memcached","OIDC/HTTPS","SOAP/REST","Pub/Sub","SQS"]
+          },
+          "merge": "replace"
+        },
+        "authenticated": {
+          "extractor_rules": [
+            "propagation de JWT/Bearer/mTLS/API key → true",
+            "appel anonyme (Redis, DB interne, IDP discovery) → false"
+          ],
+          "validation": { "type": "boolean", "required": true },
+          "merge": "replace"
+        },
+        "description": { "validation": { "type": "string" }, "merge": "preserve-manual" },
+        "client":      { "validation": { "type": "string" }, "merge": "replace" },
+        "flow":        { "validation": { "type": "string" }, "merge": "preserve-manual" },
+
+        "endpoint_mappings": {
+          "purpose": "Mapping frontend↔backend par endpoint appelé",
+          "ai_prompt_ref": "prompts/sections/connections.md#endpoint_mappings",
+          "merge": { "strategy": "dedupe-by-identity", "identity": ["method", "frontend_endpoint"] },
+          "item_fields": {
+            "frontend_endpoint": { "validation": { "type": "string", "required": true }, "merge": "replace" },
+            "backend_endpoint":  { "validation": { "type": "string", "required": true }, "merge": "replace" },
+            "method":            { "validation": { "type": "string", "required": true }, "merge": "replace" },
+            "frontend_pages":    { "validation": { "type": "array", "items": { "type": "string" } }, "merge": { "strategy": "dedupe-append" } },
+            "purpose":           { "validation": { "type": "string" }, "merge": "preserve-manual" },
+            "status": {
+              "extractor": "mapping-validator",
+              "extractor_rules": [
+                "frontend_endpoint trouve son backend_endpoint dans components[backend].endpoints → '✅ MAPPÉ'",
+                "trouve avec différence de path mineure → '⚠️ À VÉRIFIER'",
+                "non trouvé → '❌ NON MAPPÉ'"
+              ],
+              "validation": { "type": "string", "enum": ["✅ MAPPÉ", "⚠️ À VÉRIFIER", "❌ NON MAPPÉ"] },
+              "merge": "compute"
+            }
+          }
+        },
+
+        "operations": {
+          "validation": { "type": "array", "items": { "type": "string" } },
+          "merge": { "strategy": "dedupe-append" }
+        },
+        "cache_strategy": {
+          "validation": { "type": "string", "enum": ["Cache-aside","Write-through","Read-through","Write-behind"] },
+          "merge": "replace"
+        }
+      },
+      "post_validation_rules": [
+        "Tout connections[].from et connections[].to doit référencer un components[].id existant",
+        "Sinon : warning CRITICAL 'Connection <id> référence un composant inexistant: <ref>'"
+      ]
+    },
+
+    // ── 8. FLOW SUMMARY + WARNINGS (calculés) ──────────────────────────────
+    {
+      "id": "flow_summary_and_warnings",
+      "order": 8,
+      "title": "Résumé du flux & avertissements",
+      "scope": "Sections calculées depuis l'état fusionné des sections 1-7",
+      "extraction_pass": "computed",
+      "ai_prompt_ref": "prompts/sections/flow-summary-warnings.md",
+      "fields": {
+        "flow_summary": {
+          "merge": "compute",
+          "sub_fields": {
+            "user_flow": {
+              "ai_prompt_hint": "1 phrase décrivant le chemin utilisateur principal de bout en bout",
+              "merge": "preserve-manual"
+            },
+            "technologies_count": {
+              "compute": "Cardinal de l'ensemble {nom_lib} dans components[].technology ∪ components[].key_dependencies (dédupliqué par nom, indépendamment de la version)",
+              "validation": { "type": "integer", "minimum": 0 }
+            },
+            "backend_endpoints": {
+              "compute": "Somme de components[?(@.type=='backend')].endpoints.length",
+              "validation": { "type": "integer", "minimum": 0 }
+            },
+            "frontend_routes": {
+              "compute": "Somme de components[?(@.type=='frontend')].routes.length",
+              "validation": { "type": "integer", "minimum": 0 }
+            },
+            "external_services": {
+              "compute": "Nombre de components où layer == 'External'",
+              "validation": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "warnings": {
+          "merge": { "strategy": "dedupe-by-identity", "identity": ["severity", "message", "component"] },
+          "auto_generated_rules": [
+            "INFO 'Champ <path> au placeholder \"À confirmer\"' pour chaque champ resté au placeholder",
+            "INFO 'Divergence sur <path> : BASE=X, NEW=Y' quand merge=preserve-manual rejette une nouvelle valeur",
+            "INFO 'Nouveau composant détecté : <id>' à la création d'un composant en mode UPDATE",
+            "WARNING 'Composant <id> potentiellement supprimé du code' en MERGE_FULL si BASE-only",
+            "WARNING 'No database connection detected' si type ∈ {BACKEND, FULLSTACK, MICROSERVICES} et aucun component db",
+            "WARNING 'Endpoint <method> <path> sans validation' pour chaque POST/PUT/PATCH sans @Valid ou ValidationPipe",
+            "CRITICAL 'Endpoint <method> <path> authenticated=false sur route mutante' pour POST/PUT/DELETE permitAll",
+            "CRITICAL 'Connection <id> référence un composant inexistant: <ref>' si refs orphelines"
+          ],
+          "item_fields": {
+            "severity": { "validation": { "type": "string", "enum": ["INFO","WARNING","CRITICAL"], "required": true } },
+            "message":  { "validation": { "type": "string", "required": true } },
+            "component":{ "validation": { "type": "string", "required": true } },
+            "suggestion": { "validation": { "type": "string" }, "merge": "preserve-manual" }
+          }
+        }
+      }
+    }
+  ]
+}

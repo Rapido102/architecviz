@@ -1,0 +1,7 @@
+{
+  "architecture": "cegec-api",
+  "type": "FULLSTACK",
+  "version": "0.1.0",
+  "lastUpdated": "2026-05-19",
+  "description": "API backend cegec-api de gestion des gestes commerciaux, construite avec Spring Boot, Jersey (JAX-RS) et clients Feign."
+}

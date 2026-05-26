@@ -1,0 +1,78 @@
+[
+  {
+    "id": "account_client_api",
+    "label": "Account-client API",
+    "description": "Service externe de consultation des comptes client, utilisé pour récupérer les comptes d’un numéro de personne dans la vue produits client.",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign)",
+    "url": "${spring.client.rest.accountrulesapi.url}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/accounts",
+        "method": "GET"
+      }
+    ],
+    "used_by": [
+      "backend_spring"
+    ]
+  },
+  {
+    "id": "card_client_api",
+    "label": "Card-client API",
+    "description": "Service externe de consultation des cartes client, utilisé pour compléter la restitution des produits associés à un numéro de personne.",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign)",
+    "url": "${spring.client.rest.cardapi.url}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/cards",
+        "method": "GET"
+      }
+    ],
+    "used_by": [
+      "backend_spring"
+    ]
+  },
+  {
+    "id": "wsannuaire_client_api",
+    "label": "Wsannuaire-client API",
+    "description": "Service annuaire utilisé pour enrichir le contexte utilisateur CEGEC avec l’identité, la structure, le manager et les informations de contrat.",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign)",
+    "url": "${spring.client.rest.wsannuaire.url}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/me/person",
+        "method": "GET"
+      }
+    ],
+    "used_by": [
+      "backend_spring"
+    ]
+  },
+  {
+    "id": "wshabilitation_client_api",
+    "label": "Wshabilitation-client API",
+    "description": "Service d’habilitation utilisé pour déterminer le niveau d’accès CEGEC, les structures autorisées et les plafonds métier de l’utilisateur connecté.",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign)",
+    "url": "${spring.client.rest.wshabilitation.url}",
+    "consumed_via": "OpenFeign (OkHttp + Jackson)",
+    "endpoints": [
+      {
+        "path": "/users/{casId}/access_rights/CEGEC",
+        "method": "GET"
+      }
+    ],
+    "used_by": [
+      "backend_spring"
+    ]
+  }
+]

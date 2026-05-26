@@ -1,0 +1,4401 @@
+{
+  "architecture": "Isicrm",
+  "type": "BACKEND",
+  "version": "0.1.0",
+  "lastUpdated": "2026-05-21",
+  "description": "Cartographie du SI ISI-CRM et de ses dépendances métiers et techniques, incluant le backend ISI-CRM, le CRM Merlin/Edeal, les services Thrift Fortuneo, les caches Redis et les bus événementiels.",
+  "layers": [
+    {
+      "name": "Frontend",
+      "color": "#E3F2FD",
+      "description": "Couche présentation — interfaces utilisateur, SPA, MFE"
+    },
+    {
+      "name": "Backend",
+      "color": "#FFF3E0",
+      "description": "Couche métier — API REST, services, traitements"
+    },
+    {
+      "name": "Data",
+      "color": "#F3E5F5",
+      "description": "Couche persistance — bases de données, cache, files"
+    },
+    {
+      "name": "External",
+      "color": "#E8F5E9",
+      "description": "Services externes / tiers — APIs partenaires, IAM, monitoring"
+    }
+  ],
+  "components": [
+    {
+      "id": "isicrm_backend",
+      "label": "ISiCRM Backend",
+      "type": "backend",
+      "layer": "Backend",
+      "technology": "Java 17 + Spring MVC 5.3.5 + OpenFeign 13.2.1 + Apache Thrift + WAR/Tomcat 9",
+      "url": "${ISICRM_URL}",
+      "port": 8080,
+      "authentication": {
+        "type": "Sécurité portée majoritairement par l’infrastructure d’exposition (API interne / Tomcat), sans Spring Security détecté dans le code scanné",
+        "provider": "Contrôles d’accès applicatifs externes à confirmer côté plateforme d’hébergement ; 401/403 documentés dans les Swagger ISI-CRM",
+        "token_format": "Aucun token entrant standardisé détecté dans le code serveur scanné ; usage de query params métier (codeAcces) et ponctuellement du header x-arkea-numeropersonne",
+        "token_expiry": "Gérée hors application par l’infrastructure/gateway ; non portée par le code scanné",
+        "roles_permissions": "Le code ne montre pas de règles RBAC Spring Security ; l’existence de réponses 401/403 dans les Swagger suggère des contrôles en amont ou dans des couches non présentes dans ce dépôt",
+        "note": "Analyse fondée sur le staging et les Swagger/clients générés disponibles : aucune configuration SecurityFilterChain/WebSecurityConfigurerAdapter n’a été détectée, ce qui indique une sécurité probablement externalisée plutôt qu’implémentée directement dans ce code."
+      },
+      "note": "Backend legacy packagé en WAR et déployé sur Tomcat. Expose une API REST via /api/*, des servlets legacy (/personne/*, /evenement/*, /codepromo/*, /demande/*, /parametrage/*, /opportunite/*, /asyncValue), ainsi que des flux JMS et Kafka.",
+      "endpoints": [
+        {
+          "path": "/api/personnes",
+          "method": "GET",
+          "description": "Recherche une personne par numeroPersonne et typePersonne.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "numeroPersonne",
+              "typePersonne"
+            ],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "ResponseEntity<Personne>",
+          "status_codes": [
+            200,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "crm_api",
+              "resource": "/edealCRM/customrestapi/personne/numClientTemp/{numClientTemp}?flag={flag}",
+              "operation": "GET"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/{numeroPersonne}",
+          "method": "GET",
+          "description": "Récupère une personne par identifiant.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "numeroPersonne"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "Personne",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "panier_thrift",
+              "resource": "/personne",
+              "operation": "POST"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/rechercher",
+          "method": "GET",
+          "description": "Recherche des personnes par critères de dédoublonnage.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "nom",
+              "prenom",
+              "codePostal",
+              "email",
+              "dateNaissance"
+            ],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "List<PersonneEtendueSI>",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "crm_api",
+              "resource": "/edealCRM/customrestapi/personne/criteres",
+              "operation": "POST"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/{numeroPersonne}/motdepasse/reedition",
+          "method": "PUT",
+          "description": "Réédite le mot de passe d'une personne.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "codeAcces",
+              "typeMedia",
+              "tarife",
+              "userConseiller"
+            ],
+            "path": [
+              "numeroPersonne"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "ResponseEntity<Boolean>",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "backend_thrift",
+              "resource": "/securiteforte",
+              "operation": "POST"
+            },
+            {
+              "component_id": "backend_thrift",
+              "resource": "/tarification",
+              "operation": "POST",
+              "note": "Appel conditionnel si tarife=true"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/{numeroPersonne}/suiviDemande",
+          "method": "GET",
+          "description": "Retourne le suivi des demandes d'une personne.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "statuts"
+            ],
+            "path": [
+              "numeroPersonne"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "List<SuiviDemande>",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "crm_api",
+              "resource": "/edealCRM/customrestapi/personne/numClient/{idPersonne}",
+              "operation": "GET"
+            },
+            {
+              "component_id": "crm_api",
+              "resource": "/edealCRM/customrestapi/personne/{idCRM}/demandesClient",
+              "operation": "POST"
+            },
+            {
+              "component_id": "redis_cache",
+              "resource": "PARAMETRAGE_SDCQ",
+              "operation": "GET"
+            },
+            {
+              "component_id": "redis_cache",
+              "resource": "PARAMETRAGE_SDCT",
+              "operation": "GET"
+            },
+            {
+              "component_id": "gesparam_api",
+              "resource": "/gesparamservices/api/v1/tables/T38SDCQ?CD_EFS=21",
+              "operation": "GET",
+              "note": "Appel sur cache miss"
+            },
+            {
+              "component_id": "gesparam_api",
+              "resource": "/gesparamservices/api/v1/tables/T38SDCT?CD_EFS=21",
+              "operation": "GET",
+              "note": "Appel sur cache miss"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/{personNumber}/suiviDemande/{dmdToken}",
+          "method": "GET",
+          "description": "Retourne une demande client à partir d'un token.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "personNumber",
+              "dmdToken"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "Demande",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "crm_api",
+              "resource": "/edealCRM/customrestapi/personne/{personNumber}/demandeClientByToken/{tokenDmd}",
+              "operation": "GET"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/{numeroPersonne}/comptes/synthese",
+          "method": "GET",
+          "description": "Retourne la synthèse des comptes d'une personne.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "codeAcces"
+            ],
+            "path": [
+              "numeroPersonne"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "SyntheseContrats",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "backend_thrift",
+              "resource": "/synthese",
+              "operation": "POST"
+            },
+            {
+              "component_id": "backend_thrift",
+              "resource": "/operation",
+              "operation": "POST",
+              "note": "Récupération des débits différés cartes"
+            },
+            {
+              "component_id": "panier_thrift",
+              "resource": "/personne",
+              "operation": "POST",
+              "note": "Vérifications complémentaires sur le titulaire"
+            },
+            {
+              "component_id": "panier_thrift",
+              "resource": "/compte",
+              "operation": "POST",
+              "note": "Récupération de comptes génériques et comptes coupon"
+            },
+            {
+              "component_id": "pacman_thrift",
+              "resource": "/contrat",
+              "operation": "POST",
+              "note": "Comptes coupon, cas conditionnel"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/{numeroPersonne}/comptes/{numeroCompte}/details",
+          "method": "GET",
+          "description": "Retourne le détail d'un compte d'une personne.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "codeAcces",
+              "typeCompte",
+              "numeroContratSouscrit"
+            ],
+            "path": [
+              "numeroPersonne",
+              "numeroCompte"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "DetailsCompteEtendu",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "backend_thrift",
+              "resource": "/synthese",
+              "operation": "POST",
+              "note": "Comptes CCO/ESP/LIV/PEA/PPE/ORD selon typeCompte"
+            },
+            {
+              "component_id": "pacman_thrift",
+              "resource": "/operation",
+              "operation": "POST",
+              "note": "Soldes et encours selon typeCompte"
+            },
+            {
+              "component_id": "pacman_thrift",
+              "resource": "/compte",
+              "operation": "POST",
+              "note": "Solde à date / autorisation découvert selon typeCompte"
+            },
+            {
+              "component_id": "backend_thrift",
+              "resource": "/operation",
+              "operation": "POST",
+              "note": "Encours débit différé selon typeCompte"
+            },
+            {
+              "component_id": "custkn_thrift",
+              "resource": "/thrift/infosclient/",
+              "operation": "POST",
+              "note": "Critères de plafonds carte, selon type de compte"
+            },
+            {
+              "component_id": "security_proxy_api",
+              "resource": "/oauth",
+              "operation": "POST",
+              "note": "Cas PER uniquement"
+            },
+            {
+              "component_id": "investorprofile_api",
+              "resource": "/investor-profiles",
+              "operation": "GET",
+              "note": "Cas PER uniquement"
+            },
+            {
+              "component_id": "lifeinsurance_api",
+              "resource": "/accounts/{accountId}",
+              "operation": "GET",
+              "note": "Cas PER uniquement"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/{numeroPersonne}/risques/synthese",
+          "method": "GET",
+          "description": "Retourne la synthèse des risques d'une personne.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "numeroPersonne"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "SyntheseRisquesClient",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "panier_thrift",
+              "resource": "/personne",
+              "operation": "POST"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/{numeroPersonne}/certifications",
+          "method": "GET",
+          "description": "Retourne la date de dernière certification KYC.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "numeroPersonne"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "ResponseEntity<CertificationKYC>",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "client_api",
+              "resource": "/private/persons/{numeroPersonnecrypte}/certifications",
+              "operation": "GET"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/segmentation/code-acces/{codeAcces}",
+          "method": "GET",
+          "description": "Retourne la segmentation SP à partir d'un code d'accès.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "codeAcces"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "ResponseEntity<RecupererSegmentationSPResponse>",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "crm_api",
+              "resource": "/edealCRM/customrestapi/personne/codeAcces/{codeAcces}/segmentationSPParCodeAcces",
+              "operation": "GET"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/{numeroPersonne}/cashback/code-acces/{codeAcces}",
+          "method": "GET",
+          "description": "Retourne les informations cashback pour une personne et un code d'accès.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "numeroPersonne",
+              "codeAcces"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "ResponseEntity<InfoCashback>",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "security_proxy_api",
+              "resource": "/oauth",
+              "operation": "POST"
+            },
+            {
+              "component_id": "cashback_api",
+              "resource": "/users/{personNumber}/context",
+              "operation": "GET"
+            }
+          ]
+        },
+        {
+          "path": "/api/comptes/{numeroCompte}/operations",
+          "method": "GET",
+          "description": "Retourne l'historique des opérations d'un compte.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "codeAcces",
+              "dateDebut",
+              "dateFin"
+            ],
+            "path": [
+              "numeroCompte"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "List<Operation>",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "pacman_thrift",
+              "resource": "/operation",
+              "operation": "POST"
+            }
+          ]
+        },
+        {
+          "path": "/api/comptes/{numeroCompte}/soldes",
+          "method": "GET",
+          "description": "Retourne les soldes d'un compte.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "codeAcces"
+            ],
+            "path": [
+              "numeroCompte"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "SoldesCompte",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "pacman_thrift",
+              "resource": "/operation",
+              "operation": "POST"
+            }
+          ]
+        },
+        {
+          "path": "/api/comptes/{numeroCompte}/operations/titres",
+          "method": "GET",
+          "description": "Retourne les opérations titres d'un compte.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "numeroPersonne",
+              "codeAcces",
+              "typeCompte",
+              "nombreOperation",
+              "dateDebut",
+              "dateFin"
+            ],
+            "path": [
+              "numeroCompte"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "List<Operation>",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "backend_thrift",
+              "resource": "/operation",
+              "operation": "POST",
+              "note": "Historique titres PEA/PPE/ORD"
+            },
+            {
+              "component_id": "backend_thrift",
+              "resource": "/assurancevie",
+              "operation": "POST",
+              "note": "Historique assurance-vie, cas VIE uniquement"
+            }
+          ]
+        },
+        {
+          "path": "/api/contrats/{numeroContratSouscrit}/credit",
+          "method": "GET",
+          "description": "Retourne les détails d'un crédit immobilier.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "numeroContratSouscrit"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "CreditImmobilier",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "pacman_thrift",
+              "resource": "/gestioncreditimmo",
+              "operation": "POST"
+            }
+          ]
+        },
+        {
+          "path": "/api/risques/{numeroPersonne}/irreguliers",
+          "method": "GET",
+          "description": "Retourne la liste des irréguliers d'une personne.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "codesStatuts",
+              "numerosComptes"
+            ],
+            "path": [
+              "numeroPersonne"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "List<Irregulier>",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "backend_thrift",
+              "resource": "/syntheserisquesclient",
+              "operation": "POST"
+            },
+            {
+              "component_id": "panier_thrift",
+              "resource": "/compte",
+              "operation": "POST",
+              "note": "Remappage numéroContratSouscrit -> numéroCompte"
+            }
+          ]
+        },
+        {
+          "path": "/api/codepromo/{codepromo}",
+          "method": "GET",
+          "description": "Vérifie l'existence d'un code promo.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "codepromo"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "ResponseEntity<Boolean>",
+          "status_codes": [
+            200,
+            404
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "crm_api",
+              "resource": "/edealCRM/customrestapi/codepromotion/{codepromo}",
+              "operation": "GET"
+            }
+          ]
+        },
+        {
+          "path": "/api/codepromo",
+          "method": "POST",
+          "description": "Crée un code promo.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "CodePromoDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "StringResponse",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "crm_api",
+              "resource": "/edealCRM/customrestapi/codepromotion/codepromo",
+              "operation": "POST"
+            }
+          ]
+        },
+        {
+          "path": "/api/codepromo",
+          "method": "PUT",
+          "description": "Met à jour la date de fin de validité d'un code promo.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "CodePromoDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "ResponseEntity<CodePromo>",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "crm_api",
+              "resource": "/edealCRM/customrestapi/codepromotion/codepromo",
+              "operation": "PATCH"
+            }
+          ]
+        },
+        {
+          "path": "/api/editique/pdf/souscription",
+          "method": "GET",
+          "description": "Génère le PDF de souscription.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "idOpportunite"
+            ],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "StringResponse",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "crm_api",
+              "resource": "/edealCRM/customrestapi/opportunites/{idOpportunite}",
+              "operation": "GET"
+            },
+            {
+              "component_id": "crm_api",
+              "resource": "/edealCRM/customrestapi/personne/idCRM/{idCRM}",
+              "operation": "GET",
+              "note": "Appelé pour le titulaire et éventuellement le cotitulaire"
+            },
+            {
+              "component_id": "backend_thrift",
+              "resource": "/pdf",
+              "operation": "POST"
+            }
+          ]
+        },
+        {
+          "path": "/api/editique/impressionAuto",
+          "method": "POST",
+          "description": "Crée une demande d'impression automatique.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "DemandeImpressionAutomatique"
+            ],
+            "headers": []
+          },
+          "response_schema": "ResponseEntity<String|ErrorResource>",
+          "status_codes": [
+            200,
+            409,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "dms_api",
+              "resource": "/api/v1/impression",
+              "operation": "POST"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/devices",
+          "method": "GET",
+          "description": "Liste les devices enrôlés d'une personne.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "numeroPersonne",
+              "codeAcces"
+            ],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "List<Device>",
+          "status_codes": [
+            200,
+            400,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "security_proxy_api",
+              "resource": "/oauth",
+              "operation": "POST"
+            },
+            {
+              "component_id": "security_api",
+              "resource": "/security-api/enrollment/devices",
+              "operation": "POST"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/devices/operations",
+          "method": "POST",
+          "description": "Crée une opération d'authentification forte.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "numeroPersonne",
+              "codeAcces"
+            ],
+            "path": [],
+            "body": [
+              "AuthentificationForteArgs"
+            ],
+            "headers": []
+          },
+          "response_schema": "StringResponse",
+          "status_codes": [
+            200,
+            400,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "security_proxy_api",
+              "resource": "/oauth",
+              "operation": "POST"
+            },
+            {
+              "component_id": "security_api",
+              "resource": "/security-api/operation",
+              "operation": "POST"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/devices/operations/{id}/status",
+          "method": "GET",
+          "description": "Retourne le statut d'une opération d'authentification forte.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "numeroPersonne",
+              "codeAcces"
+            ],
+            "path": [
+              "id"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "StringResponse",
+          "status_codes": [
+            200,
+            400,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "security_proxy_api",
+              "resource": "/oauth",
+              "operation": "POST"
+            },
+            {
+              "component_id": "security_api",
+              "resource": "/security-api/pending-operations/{idOperation}/status",
+              "operation": "GET"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/devices/authentification",
+          "method": "POST",
+          "description": "Crée une demande d'authentification forte côté workflow.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "AuthentificationForteArgs"
+            ],
+            "headers": [
+              "x-arkea-numeropersonne"
+            ]
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "crm_api",
+              "resource": "/edealCRM/customrestapi/personne/numClient/{idPersonne}",
+              "operation": "GET"
+            },
+            {
+              "component_id": "crm_api",
+              "resource": "/edealCRM/customrestapi/demandes",
+              "operation": "POST"
+            }
+          ]
+        },
+        {
+          "path": "/api/personnes/devices/authentification/summary",
+          "method": "POST",
+          "description": "Retourne le résumé d'une demande d'authentification forte.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "AuthentificationForteArgs"
+            ],
+            "headers": []
+          },
+          "response_schema": "Summary",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "security_api",
+              "resource": "/security-api/operation",
+              "operation": "POST",
+              "note": "Résumé/preview de la demande d’authentification forte, rapproché du même domaine fonctionnel que la création d’opération ; mapping déduit du Swagger personnesdevices et des endpoints voisins."
+            }
+          ]
+        }
+      ],
+      "deployment": {
+        "containerized": true,
+        "platform": "Docker + Tomcat 9",
+        "artifact": "WAR",
+        "ci_cd": "GitLab CI + Gradle + Makefile",
+        "orchestration": "À confirmer",
+        "note": "Dockerfile basé sur une image Tomcat Java 17. L'artefact généré est isicrm.war."
+      },
+      "description": "Backend ISI-CRM exposant des APIs métiers sur les personnes, comptes, contrats, risques, code promo, éditique et authentification forte. Il joue un rôle de façade/orchestrateur entre CRM Merlin, services Fortuneo en Thrift, APIs de sécurité et caches techniques."
+    },
+    {
+      "id": "redis_cache",
+      "label": "Redis Sentinel Cache",
+      "type": "cache",
+      "layer": "Data",
+      "technology": "Redis Sentinel",
+      "url": "${REDIS_URL}",
+      "port": 26379,
+      "consumed_via": "JedisSentinelPool",
+      "cached_data": [
+        {
+          "endpoint": "/api/parametrage/*",
+          "key_pattern": "PARAMETRAGE_EVENEMENT_CRM",
+          "ttl": "12h",
+          "purpose": "Cache du paramétrage des événements CRM récupéré depuis Gesparam"
+        },
+        {
+          "endpoint": "/api/parametrage/*",
+          "key_pattern": "PARAMETRAGE_SDCQ",
+          "ttl": "12h",
+          "purpose": "Cache du paramétrage des qualifications récupéré depuis Gesparam"
+        },
+        {
+          "endpoint": "/api/parametrage/*",
+          "key_pattern": "PARAMETRAGE_SDCT",
+          "ttl": "12h",
+          "purpose": "Cache du paramétrage des statuts et transcodages récupéré depuis Gesparam"
+        }
+      ],
+      "note": "Configuration Redis Sentinel détectée dans cache.properties ; nom de master observé : 21.3883.isicrm.",
+      "description": "Cache technique partagé utilisé par ISI-CRM pour éviter des appels répétés aux services de paramétrage et accélérer la résolution des tables métier et transcodifications."
+    },
+    {
+      "id": "ibm_mq",
+      "label": "IBM MQ",
+      "type": "mq",
+      "layer": "Data",
+      "technology": "IBM MQ + JMS",
+      "url": "${IBM_MQ_URL}",
+      "port": 1414,
+      "consumed_via": "JMS",
+      "note": "Configuration détectée dans jmsconf.xml ; queueManager=mqtuxdev, channels MQTUXDEV.FORTUNEO / MQTUXDEV.FTO.ISICRM. Queues observées : 3883.PANIER_ISICRM.EVENEMENTCRM.21, 3883.CREDITCONSO_ISICRM.EVENEMENTCRM.21, 3883.CRMEVENTWEBHOOK_ISICRM.EVENEMENTCRM.21, 3883.PERSONSYNC_ISICRM.EVENEMENTCRM.21, 3883.KYCSYNC_ISICRM.EVENEMENTCRM.21.",
+      "description": "Bus JMS legacy utilisé pour transporter des événements CRM et synchronisations asynchrones entre ISI-CRM et d’autres systèmes Fortuneo."
+    },
+    {
+      "id": "kafka_cluster",
+      "label": "Kafka Cluster",
+      "type": "mq",
+      "layer": "Data",
+      "technology": "Apache Kafka + spring-kafka 2.9.13 + SSL",
+      "url": "${KAFKA_BOOTSTRAP_SERVERS}",
+      "port": 9092,
+      "consumed_via": "KafkaTemplate + @KafkaListener",
+      "note": "Bootstrap server configuré via /kafka/bootstrapAddress. Consumer détecté sur le topic 1C36.contestationwkfapi.generic.21. Producer détecté vers le topic 3883.isi-crm.EventSync.21.",
+      "description": "Bus Kafka utilisé par ISI-CRM pour publier et consommer des événements d’intégration, notamment autour de la synchronisation métier et des workflows contestation."
+    },
+    {
+      "id": "crm_api",
+      "label": "CRM Custom REST API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+      "url": "${CRM_URL}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/edealCRM/customrestapi/personne",
+          "method": "POST",
+          "description": "Crée ou met à jour une personne côté CRM Merlin/Edeal."
+        },
+        {
+          "path": "/edealCRM/customrestapi/personne/idCRM/{idCRM}",
+          "method": "GET",
+          "description": "Retourne une personne CRM à partir de son identifiant CRM."
+        },
+        {
+          "path": "/edealCRM/customrestapi/demandes",
+          "method": "POST",
+          "description": "Crée une demande CRM côté Merlin/Edeal."
+        },
+        {
+          "path": "/edealCRM/customrestapi/demandes/{idDemande}",
+          "method": "GET",
+          "description": "Retourne une demande CRM à partir de son identifiant technique."
+        },
+        {
+          "path": "/edealCRM/customrestapi/opportunites",
+          "method": "POST",
+          "description": "Crée ou fusionne une opportunité commerciale côté CRM."
+        },
+        {
+          "path": "/edealCRM/customrestapi/interactions/{idInteraction}/message",
+          "method": "GET",
+          "description": "Retourne le message détaillé associé à une interaction CRM."
+        },
+        {
+          "path": "/edealCRM/customrestapi/codepromotion/{codepromo}",
+          "method": "GET",
+          "description": "Vérifie l’existence d’un code promotionnel dans le CRM."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "API REST Merlin/Edeal consommée par ISI-CRM pour créer, lire et enrichir personnes, demandes, opportunités, interactions et codes promotionnels côté CRM."
+    },
+    {
+      "id": "dms_api",
+      "label": "DMS API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+      "url": "${DMS_URL}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/api/v1/impression",
+          "method": "POST",
+          "description": "Déclenche une demande d’impression automatique dans le système documentaire."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "Service documentaire utilisé pour déclencher des impressions automatiques et déposer des demandes d’édition vers le système documentaire."
+    },
+    {
+      "id": "nba_api",
+      "label": "Next Best Action API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+      "url": "${NBA_URL}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/api/v1/actions",
+          "method": "GET",
+          "description": "Retourne les Next Best Actions disponibles pour le contexte métier."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "Service de recommandations métiers exposant des Next Best Actions consommées par ISI-CRM pour la vision conseiller.",
+      "external_ref": "nba"
+    },
+    {
+      "id": "flowdistribution_api",
+      "label": "Flow Distribution API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+      "url": "${FLOWDISTRIBUTION_URL}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/api/v1/scores",
+          "method": "GET",
+          "description": "Retourne des scores de distribution ou de priorisation de flux."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "Service de scoring et de distribution de flux utilisé pour orienter ou prioriser certains parcours métier.",
+      "external_ref": "curseur"
+    },
+    {
+      "id": "sponsorship_api",
+      "label": "Sponsorship API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+      "url": "${SPONSORSHIP_URL}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/api/v1/sponsor/private/info",
+          "method": "GET",
+          "description": "Retourne les informations de parrainage liées à un client."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "Service de parrainage consulté pour récupérer les informations sponsor/filleul liées aux parcours client."
+    },
+    {
+      "id": "vault_api",
+      "label": "Vault API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+      "url": "${VAULT_URL}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/vault/v2/app_get_key",
+          "method": "POST",
+          "description": "Récupère une clé ou un secret applicatif depuis le coffre-fort."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "Coffre de secrets appelé par ISI-CRM pour récupérer des clés ou secrets techniques nécessaires aux intégrations sortantes."
+    },
+    {
+      "id": "client_api",
+      "label": "Client API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+      "url": "${CLIENTAPI_URL}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/private/persons/{numeroPersonne}/purge/status",
+          "method": "PATCH",
+          "description": "Met à jour le statut de purge d’une personne côté API client."
+        },
+        {
+          "path": "/private/persons/{numeroPersonnecrypte}/certifications",
+          "method": "GET",
+          "description": "Retourne les informations de certification KYC d’une personne."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "API client transverse utilisée pour consulter des certifications KYC et notifier certains statuts comme la purge."
+    },
+    {
+      "id": "security_api",
+      "label": "Security API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+      "url": "${SECURITY_URL}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/security-api/enrollment/devices",
+          "method": "POST",
+          "description": "Retourne ou recherche les devices enrôlés pour l’authentification forte."
+        },
+        {
+          "path": "/security-api/pending-operations/{idOperation}/status",
+          "method": "GET",
+          "description": "Retourne le statut d’une opération d’authentification forte."
+        },
+        {
+          "path": "/security-api/operation",
+          "method": "POST",
+          "description": "Crée ou prépare une opération d’authentification forte."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "API de sécurité forte utilisée pour gérer les devices enrôlés, créer des opérations d’authentification et consulter leur statut."
+    },
+    {
+      "id": "security_proxy_api",
+      "label": "Security Proxy API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+      "url": "${SECURITY_PROXY_URL}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/oauth",
+          "method": "POST",
+          "description": "Délivre un jeton OAuth technique pour les appels sécurisés suivants."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "Proxy OAuth utilisé pour obtenir les jetons techniques nécessaires avant d’appeler certaines APIs sécurisées du SI."
+    },
+    {
+      "id": "gesparam_api",
+      "label": "Gesparam Services API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+      "url": "${GESPARAMSERVICES_URL}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/gesparamservices/api/v1/tables/T38SAM0?CD_EFS=21",
+          "method": "GET",
+          "description": "Retourne la table de paramétrage métier T38SAM0."
+        },
+        {
+          "path": "/gesparamservices/api/v1/tables/T38SDCQ?CD_EFS=21",
+          "method": "GET",
+          "description": "Retourne la table de paramétrage T38SDCQ utilisée pour les qualifications."
+        },
+        {
+          "path": "/gesparamservices/api/v1/tables/T38SDCT?CD_EFS=21",
+          "method": "GET",
+          "description": "Retourne la table de paramétrage T38SDCT utilisée pour les statuts et transcodages."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "Service de paramètres métiers exposant les tables de référence et de transcodification mises ensuite en cache par ISI-CRM."
+    },
+    {
+      "id": "cashback_api",
+      "label": "Cashback API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+      "url": "${CASHBACKAPI_URL}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/users/{personNumber}/context",
+          "method": "GET",
+          "description": "Retourne le contexte cashback d’un client."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "Service cashback consulté pour récupérer le contexte et les informations de cashback d’un client."
+    },
+    {
+      "id": "investorprofile_api",
+      "label": "Investor Profile API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+      "url": "${INVESTORPROFILEAPI_URL}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/investor-profiles",
+          "method": "GET",
+          "description": "Retourne le profil investisseur d’un client."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "API de profil investisseur utilisée notamment dans les parcours d’épargne/PER pour récupérer les informations de profilage."
+    },
+    {
+      "id": "lifeinsurance_api",
+      "label": "Life Insurance API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+      "url": "${LIFEINSURANCEAPI_URL}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/accounts/{accountId}",
+          "method": "GET",
+          "description": "Retourne le détail d’un compte d’assurance-vie ou PER."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "API assurance vie consultée pour enrichir les détails de comptes et contrats de type PER/assurance vie."
+    },
+    {
+      "id": "account_api",
+      "label": "Account API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign 13.2.1 + OkHttp + Jackson)",
+      "url": "${ACCOUNTAPI_URL}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/accounts",
+          "method": "GET",
+          "description": "Retourne des informations consolidées sur les comptes."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "API de comptes transverse utilisée pour consulter des informations consolidées sur les comptes bancaires."
+    },
+    {
+      "id": "webstore_service",
+      "label": "WebStore",
+      "type": "service",
+      "layer": "External",
+      "technology": "HTTP file service via proxy servlet",
+      "url": "${WEBSTORE_URL}",
+      "consumed_via": "ProxyServlet",
+      "endpoints": [
+        {
+          "path": "/fortuneo/FormPJ/",
+          "method": "GET",
+          "description": "Accède aux documents et pièces jointes stockés dans le WebStore."
+        },
+        {
+          "path": "/fortuneo/MERLIN",
+          "method": "GET",
+          "description": "Accède à l’espace Merlin du WebStore."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "Service HTTP de fichiers et de pièces jointes utilisé pour accéder à des documents ou ressources stockées côté WebStore."
+    },
+    {
+      "id": "panier_thrift",
+      "label": "Panier Thrift Services",
+      "type": "service",
+      "layer": "External",
+      "technology": "Apache Thrift (binary over HTTP)",
+      "url": "${DAO_THRIFT_PANIER_BASE}",
+      "consumed_via": "fortuneo-thrift-client",
+      "endpoints": [
+        {
+          "path": "/personne",
+          "method": "POST",
+          "description": "Point d’entrée Thrift pour les données personne."
+        },
+        {
+          "path": "/compte",
+          "method": "POST",
+          "description": "Point d’entrée Thrift pour les données de compte."
+        },
+        {
+          "path": "/adresse",
+          "method": "POST",
+          "description": "Point d’entrée Thrift pour les données d’adresse."
+        },
+        {
+          "path": "/crm",
+          "method": "POST",
+          "description": "Point d’entrée Thrift pour les opérations CRM legacy."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "Services Thrift legacy centrés sur les données client, compte, adresse et CRM, utilisés comme sources cœur de gestion Fortuneo."
+    },
+    {
+      "id": "backend_thrift",
+      "label": "Backend Thrift Services",
+      "type": "service",
+      "layer": "External",
+      "technology": "Apache Thrift (binary over HTTP)",
+      "url": "${DAO_THRIFT_BACKEND_BASE}",
+      "consumed_via": "fortuneo-thrift-client",
+      "endpoints": [
+        {
+          "path": "/personne",
+          "method": "POST",
+          "description": "Point d’entrée backend Thrift pour les données personne."
+        },
+        {
+          "path": "/compte",
+          "method": "POST",
+          "description": "Point d’entrée backend Thrift pour les données de compte."
+        },
+        {
+          "path": "/operation",
+          "method": "POST",
+          "description": "Point d’entrée backend Thrift pour les opérations bancaires."
+        },
+        {
+          "path": "/portefeuille",
+          "method": "POST",
+          "description": "Point d’entrée backend Thrift pour les données de portefeuille."
+        },
+        {
+          "path": "/assurancevie",
+          "method": "POST",
+          "description": "Point d’entrée backend Thrift pour les contrats d’assurance-vie."
+        },
+        {
+          "path": "/pdf",
+          "method": "POST",
+          "description": "Génère ou récupère des documents PDF via le backend Thrift."
+        },
+        {
+          "path": "/securiteforte",
+          "method": "POST",
+          "description": "Expose des fonctions de sécurité forte via Thrift."
+        },
+        {
+          "path": "/segmentationSP",
+          "method": "POST",
+          "description": "Retourne ou calcule la segmentation SP via Thrift."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "Services Thrift backend fournissant opérations, portefeuille, PDF, sécurité forte et autres fonctions cœur de gestion non exposées en REST."
+    },
+    {
+      "id": "pacman_thrift",
+      "label": "Pacman Thrift Services",
+      "type": "service",
+      "layer": "External",
+      "technology": "Apache Thrift (binary over HTTP)",
+      "url": "${DAO_THRIFT_PACMAN_BASE}",
+      "consumed_via": "fortuneo-thrift-client",
+      "endpoints": [
+        {
+          "path": "/operation",
+          "method": "POST",
+          "description": "Point d’entrée Pacman pour l’historique et les opérations."
+        },
+        {
+          "path": "/carte",
+          "method": "POST",
+          "description": "Point d’entrée Pacman pour les données cartes."
+        },
+        {
+          "path": "/compte",
+          "method": "POST",
+          "description": "Point d’entrée Pacman pour les données comptes."
+        },
+        {
+          "path": "/contrat",
+          "method": "POST",
+          "description": "Point d’entrée Pacman pour les contrats."
+        },
+        {
+          "path": "/livret",
+          "method": "POST",
+          "description": "Point d’entrée Pacman pour les livrets."
+        },
+        {
+          "path": "/gestioncreditimmo",
+          "method": "POST",
+          "description": "Point d’entrée Pacman pour la gestion du crédit immobilier."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "Services Thrift spécialisés sur opérations, cartes, comptes, contrats, livrets et crédits immobiliers."
+    },
+    {
+      "id": "souscriptionback_thrift",
+      "label": "Souscription Back Thrift Services",
+      "type": "service",
+      "layer": "External",
+      "technology": "Apache Thrift (binary over HTTP)",
+      "url": "${DAO_THRIFT_SOUSBACK_BASE}",
+      "consumed_via": "fortuneo-thrift-client",
+      "endpoints": [
+        {
+          "path": "/souscriptionimmo",
+          "method": "POST",
+          "description": "Expose les traitements de souscription immobilière."
+        },
+        {
+          "path": "/souscripteur",
+          "method": "POST",
+          "description": "Expose les informations de souscripteur côté back-office."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "Services Thrift de back-office de souscription utilisés pour les dossiers immo et les informations souscripteur."
+    },
+    {
+      "id": "custkn_thrift",
+      "label": "Custkn Thrift Services",
+      "type": "service",
+      "layer": "External",
+      "technology": "Apache Thrift (binary over HTTP)",
+      "url": "${DAO_THRIFT_CUSTKN_BASE}",
+      "consumed_via": "fortuneo-thrift-client",
+      "endpoints": [
+        {
+          "path": "/thrift/infosclient/",
+          "method": "POST",
+          "description": "Expose les informations client via le service CustKN."
+        },
+        {
+          "path": "/thrift/profilinvestisseur/",
+          "method": "POST",
+          "description": "Expose le profil investisseur via le service CustKN."
+        }
+      ],
+      "used_by": [
+        "isicrm_backend"
+      ],
+      "description": "Services Thrift liés aux informations client et au profil investisseur, utilisés dans les parcours de connaissance client et plafonds."
+    },
+    {
+      "id": "edeal_parent",
+      "label": "Edeal Parent",
+      "description": "Application E-DEAL CRM Fortuneo packagée en WAR et déployée sur Tomcat. Elle expose une API REST sous /customrestapi pour gérer personnes, entreprises, demandes, opportunités, interactions, pièces justificatives et référentiels métier, tout en s’appuyant sur la base Oracle Merlin et des événements Kafka.",
+      "type": "backend",
+      "layer": "Backend",
+      "technology": "Java + Spring MVC 5.3.23 + Swagger Spring MVC 1.0.2 + WAR/Tomcat",
+      "url": "${EDEALCRM_URL}",
+      "authentication": {
+        "type": "CAS SSO (session web)",
+        "provider": "Arkéa CAS via GicmCASFilter",
+        "token_format": "Session/cookie CAS ; /customrestapi/* exclu du filtre CAS",
+        "token_expiry": "Durée de session Tomcat/CAS à confirmer",
+        "roles_permissions": "Contrôles CAS et filtres web sur l’application ; les endpoints /customrestapi/* sont explicitement exclus du filtre CAS",
+        "note": "web.xml mappe GicmCASFilter sur /* mais /customrestapi/* est aussi exclu via DoNothingFilter et cas.filter.path.exclusion dans ClientGestionContexte.properties."
+      },
+      "endpoints": [
+        {
+          "path": "/customrestapi/personne",
+          "method": "POST",
+          "description": "Crée une personne et retourne son identifiant CRM.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "PersonneDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerPersonneResponse",
+          "status_codes": [
+            201,
+            405,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT",
+              "note": "Recherche d’un doublon puis création/mise à jour éventuelle."
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "UPSERT",
+              "note": "Création ou fusion de la personne selon les champs d’unicité."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/fusion",
+          "method": "POST",
+          "description": "Fusionne les champs d’un client existant ou crée la personne si nécessaire.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "PersonneDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerPersonneResponse",
+          "status_codes": [
+            201,
+            405,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT",
+              "note": "Recherche de la personne existante par code CRM, numéro client ou dédoublonnage."
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "UPSERT",
+              "note": "Fusion des données dans la personne existante ou création du prospect."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/{idPersonne}",
+          "method": "DELETE",
+          "description": "Supprime la personne cible.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idPersonne"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "DELETE"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/criteres",
+          "method": "POST",
+          "description": "Recherche des personnes par critères de dédoublonnage.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "InfosDedoublonnageBean"
+            ],
+            "headers": []
+          },
+          "response_schema": "List<PersonneDto>",
+          "status_codes": [
+            201,
+            405,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT",
+              "note": "Recherche multi-critères de dédoublonnage."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/numClient/{idPersonne}",
+          "method": "GET",
+          "description": "Récupère une personne par numéro client.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idPersonne"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "PersonneDto",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/numClientTemp/{numClientTemp}",
+          "method": "GET",
+          "description": "Récupère une personne par identifiant client temporaire ou numéro selon le flag.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "flag"
+            ],
+            "path": [
+              "numClientTemp"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "PersonneDto",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/identifiantSite/{idSite}",
+          "method": "GET",
+          "description": "Récupère une personne à partir de son identifiant site.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idSite"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "PersonneDto",
+          "status_codes": [
+            200,
+            404,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/idCRM/{idCRM}",
+          "method": "GET",
+          "description": "Récupère une personne à partir de son code CRM.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idCRM"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "PersonneDto",
+          "status_codes": [
+            200,
+            404,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/idCRM/{idCRM}/infosMarketingEtConsentements",
+          "method": "PUT",
+          "description": "Met à jour les informations marketing et les consentements d’une personne.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idCRM"
+            ],
+            "body": [
+              "InfosMarketingEtConsentementsBean"
+            ],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200,
+            404,
+            422,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "UPDATE",
+              "note": "Mise à jour des informations marketing et consentements."
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "3883.merlin.consents.*",
+              "operation": "PUBLISH",
+              "note": "Publication asynchrone des consentements via job métier."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/purge",
+          "method": "DELETE",
+          "description": "Purge les dossiers de personnes et d’entreprises fournis dans le body.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "DossiersAPurgerBean"
+            ],
+            "headers": []
+          },
+          "response_schema": "void",
+          "status_codes": [
+            200,
+            422,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "DELETE",
+              "note": "Purge des dossiers personne."
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Enterprise",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Enterprise",
+              "operation": "DELETE",
+              "note": "Purge des dossiers entreprise."
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "HistoriqueSuppression_",
+              "operation": "INSERT",
+              "note": "Traçabilité potentielle de la purge à confirmer."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/{idCRM}/demandes",
+          "method": "GET",
+          "description": "Recherche des demandes d’une personne selon des critères métier.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "etapes",
+              "statuts",
+              "qualifications",
+              "produits",
+              "beneficiaire",
+              "demandeurs"
+            ],
+            "path": [
+              "idCRM"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "List<DemandeDto>",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/{idCRM}/demandesClient/count",
+          "method": "GET",
+          "description": "Retourne le nombre de demandes client en cours pour une personne.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "etapes",
+              "statuts",
+              "qualifications",
+              "produits",
+              "beneficiaire",
+              "demandeurs"
+            ],
+            "path": [
+              "idCRM"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "Number",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/{idCRM}/demandesClient",
+          "method": "GET",
+          "description": "Recherche des demandes client d’une personne avec synthèse métier.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "etapes",
+              "statuts",
+              "qualifications",
+              "produits",
+              "beneficiaire",
+              "demandeurs"
+            ],
+            "path": [
+              "idCRM"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "List<DemandeDto>",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "FTOHistory_",
+              "operation": "SELECT",
+              "note": "Récupération de la date de dernier retour PM pour les demandes non CLOSED."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/{idCRM}/demandesClient",
+          "method": "POST",
+          "description": "Recherche des demandes client d’une personne à partir d’un body de critères.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idCRM"
+            ],
+            "body": [
+              "DemandesClientRequestDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "List<DemandeDto>",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "FTOHistory_",
+              "operation": "SELECT",
+              "note": "Récupération de la date de dernier retour PM pour les demandes non CLOSED."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/{personNumber}/demandeClientByToken/{tokenDmd}",
+          "method": "GET",
+          "description": "Recherche une demande client en attente à partir de son token et du numéro personne.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "personNumber",
+              "tokenDmd"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "DemandeDto",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Messages",
+              "operation": "SELECT",
+              "note": "Lecture du message associé pour extraire une route Kiamo éventuelle."
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "SELECT",
+              "note": "Lecture de l’interaction liée à la demande PM."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/{idCRM}/demandesClientPmById/{tokenDmd}",
+          "method": "GET",
+          "description": "Recherche une demande client PM en attente à partir de son token.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idCRM",
+              "tokenDmd"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "DemandeDto",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/{idCRMBeneficiaire}/demandes/add",
+          "method": "GET",
+          "description": "Recherche une demande avec ADD irrégulière pour un bénéficiaire et un compte.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "numeroCompte",
+              "montantADD"
+            ],
+            "path": [
+              "idCRMBeneficiaire"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "DemandeDto",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/{idCRM}/demandes/{numDossierMobilite}",
+          "method": "GET",
+          "description": "Recherche une demande par numéro de dossier mobilité.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idCRM",
+              "numDossierMobilite"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "DemandeDto",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/{idCRM}/alertes",
+          "method": "GET",
+          "description": "Retourne les alertes rattachées à une personne et à ses demandes.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "codeAlerte"
+            ],
+            "path": [
+              "idCRM"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "AlerteResponse",
+          "status_codes": [
+            200,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "AlerteFTO_",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT",
+              "note": "Chargement des alertes de demandes liées à la personne."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/{idCRM}/alertes",
+          "method": "PUT",
+          "description": "Crée ou met à jour une alerte sur une personne.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idCRM"
+            ],
+            "body": [
+              "AlerteFTODTO"
+            ],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "AlerteFTO_",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "AlerteFTO_",
+              "operation": "UPSERT",
+              "note": "Création ou mise à jour de l’alerte."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/idCRM/{idCRM}/segmentationSP",
+          "method": "GET",
+          "description": "Récupère la segmentation SP d’une personne via son code CRM.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idCRM"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "RecupererSegmentationSPResponse",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/personne/codeAcces/{codeAcces}/segmentationSPParCodeAcces",
+          "method": "GET",
+          "description": "Récupère la segmentation SP d’une personne à partir de son code d’accès.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "codeAcces"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "RecupererSegmentationSPResponse",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Person",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/demandes",
+          "method": "POST",
+          "description": "Crée une demande.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "DemandeDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerDemandeResponse",
+          "status_codes": [
+            201,
+            400,
+            404,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "INSERT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/demandes/{id}",
+          "method": "GET",
+          "description": "Recherche une demande par identifiant technique.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "id"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "DemandeDto",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/demandes",
+          "method": "GET",
+          "description": "Recherche des demandes par idConversation ou référence externe.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "referenceExterne",
+              "idConversation"
+            ],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "List<DemandeDto>",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/demandes/{id}",
+          "method": "PATCH",
+          "description": "Modifie partiellement une demande.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "id"
+            ],
+            "body": [
+              "DemandeDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "DemandeDto",
+          "status_codes": [
+            200,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "UPDATE"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/demandes/{idDemande}",
+          "method": "DELETE",
+          "description": "Supprime la demande cible.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idDemande"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "DELETE"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/demandes/pilotage/{idDemande}",
+          "method": "POST",
+          "description": "Pilote l’évolution d’une demande depuis le SI.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "code"
+            ],
+            "path": [
+              "idDemande"
+            ],
+            "body": [
+              "DemandeDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerDemandeResponse",
+          "status_codes": [
+            200,
+            404,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "UPDATE",
+              "note": "Transition d’état / pilotage."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/demandes/{idDemande}/codepromo/{codePromo}",
+          "method": "PUT",
+          "description": "Met à jour le code promotionnel d’une demande.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idDemande",
+              "codePromo"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "CreerDemandeResponse",
+          "status_codes": [
+            201,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "CodePromo_",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "UPDATE",
+              "note": "Mise à jour du code promo sur la demande."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/demandes/{dmdID}",
+          "method": "PUT",
+          "description": "Fait évoluer une demande via un code d’événement.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "code"
+            ],
+            "path": [
+              "dmdID"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "CreerDemandeResponse",
+          "status_codes": [
+            200,
+            404,
+            422,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "UPDATE",
+              "note": "Évolution de la demande via code événement."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/demandes/{idDemande}/nantissement",
+          "method": "GET",
+          "description": "Retourne les informations de nantissement de l’opportunité liée à une demande.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idDemande"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "NantissementOpportuniteDto",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Opportunity",
+              "operation": "SELECT",
+              "note": "Lecture de l’opportunité liée à la demande pour le nantissement."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/demandes/{idDemande}/pieces",
+          "method": "GET",
+          "description": "Retourne les pièces à fournir associées à une demande.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idDemande"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "List<PieceAFournirDto>",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "PieceAFournir_",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/opportunites",
+          "method": "POST",
+          "description": "Crée une opportunité ou fusionne avec une opportunité existante.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "OpportuniteDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerOpportuniteResponse",
+          "status_codes": [
+            201,
+            405,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Opportunity",
+              "operation": "SELECT",
+              "note": "Recherche d’une opportunité existante par personne/produit."
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Opportunity",
+              "operation": "UPSERT",
+              "note": "Création ou fusion de l’opportunité."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/opportunites/{id}",
+          "method": "GET",
+          "description": "Recherche une opportunité par identifiant technique.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "id"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "OpportuniteDto",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Opportunity",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/opportunites",
+          "method": "GET",
+          "description": "Recherche des opportunités par idConversation.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "idConversation"
+            ],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "List<OpportuniteDto>",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Opportunity",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/opportunites/{idProduct}/{codeCRM}",
+          "method": "GET",
+          "description": "Recherche des opportunités par code produit et code CRM.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idProduct",
+              "codeCRM"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "List<OpportuniteDto>",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Opportunity",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/opportunites/{id}",
+          "method": "PATCH",
+          "description": "Modifie partiellement une opportunité.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "id"
+            ],
+            "body": [
+              "OpportuniteDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "OpportuniteDto",
+          "status_codes": [
+            200,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Opportunity",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Opportunity",
+              "operation": "UPDATE"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/opportunites",
+          "method": "DELETE",
+          "description": "Supprime les opportunités associées à un numéro Topaze.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "numeroPersonne"
+            ],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Opportunity",
+              "operation": "DELETE",
+              "note": "Suppression des opportunités liées à un numéro personne."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/opportunites/{idOpportunite}",
+          "method": "DELETE",
+          "description": "Supprime l’opportunité cible.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idOpportunite"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Opportunity",
+              "operation": "DELETE"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/enterprise",
+          "method": "POST",
+          "description": "Crée une entreprise ou fusionne avec l’existant selon le code CRM / numéro client.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "EnterpriseDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreateEnterpriseResponse",
+          "status_codes": [
+            201,
+            405,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Enterprise",
+              "operation": "SELECT",
+              "note": "Recherche de l’entreprise existante par code CRM ou numéro client."
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Enterprise",
+              "operation": "UPDATE",
+              "note": "Fusion dans l’entreprise existante ; création réelle à confirmer dans ce flux."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/enterprise/IdSite/{IdSite}",
+          "method": "GET",
+          "description": "Récupère une entreprise par identifiant site.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "IdSite"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "EnterpriseDto",
+          "status_codes": [
+            200,
+            404,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Enterprise",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/enterprise/numClient/{idPersonne}",
+          "method": "GET",
+          "description": "Récupère une entreprise par numéro client.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idPersonne"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "EnterpriseDto",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Enterprise",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/enterprise/idCRM/{idCRM}",
+          "method": "GET",
+          "description": "Récupère une entreprise par code CRM.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idCRM"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "EnterpriseDto",
+          "status_codes": [
+            200,
+            404,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Enterprise",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/enterprise/{idCRM}/alertes",
+          "method": "GET",
+          "description": "Retourne les alertes associées à une entreprise.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "codeAlerte"
+            ],
+            "path": [
+              "idCRM"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "AlerteResponse",
+          "status_codes": [
+            200,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Enterprise",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "AlerteFTO_",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/enterprise/{idCRM}/alertes",
+          "method": "PUT",
+          "description": "Crée ou met à jour une alerte sur une entreprise.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idCRM"
+            ],
+            "body": [
+              "AlerteFTODTO"
+            ],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Enterprise",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "AlerteFTO_",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "AlerteFTO_",
+              "operation": "UPSERT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/interactions/notes",
+          "method": "POST",
+          "description": "Crée une interaction de type note.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "InteractionNotesDTO"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerInteractionResponse",
+          "status_codes": [
+            201,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Messages",
+              "operation": "UPSERT",
+              "note": "Message / payload associé à l’interaction à confirmer selon le type."
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "3883.merlin.interactions*",
+              "operation": "PUBLISH",
+              "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/interactions/rdv",
+          "method": "POST",
+          "description": "Crée une interaction de type rendez-vous.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "InteractionRdvDTO"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerInteractionResponse",
+          "status_codes": [
+            201,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Messages",
+              "operation": "UPSERT",
+              "note": "Message / payload associé à l’interaction à confirmer selon le type."
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "3883.merlin.interactions*",
+              "operation": "PUBLISH",
+              "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/interactions/taches",
+          "method": "POST",
+          "description": "Crée une interaction de type tâche.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "InteractionTachesDTO"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerInteractionResponse",
+          "status_codes": [
+            201,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Messages",
+              "operation": "UPSERT",
+              "note": "Message / payload associé à l’interaction à confirmer selon le type."
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "3883.merlin.interactions*",
+              "operation": "PUBLISH",
+              "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/interactions/courrierSortant",
+          "method": "POST",
+          "description": "Crée une interaction de type courrier sortant.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "InteractionCourrierSortantDTO"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerInteractionResponse",
+          "status_codes": [
+            201,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Messages",
+              "operation": "UPSERT",
+              "note": "Message / payload associé à l’interaction à confirmer selon le type."
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "3883.merlin.interactions*",
+              "operation": "PUBLISH",
+              "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/interactions/courrierEntrant",
+          "method": "POST",
+          "description": "Crée une interaction de type courrier entrant.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "InteractionCourrierEntrantDTO"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerInteractionResponse",
+          "status_codes": [
+            201,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Messages",
+              "operation": "UPSERT",
+              "note": "Message / payload associé à l’interaction à confirmer selon le type."
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "3883.merlin.interactions*",
+              "operation": "PUBLISH",
+              "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/interactions/emailSortant",
+          "method": "POST",
+          "description": "Crée une interaction de type email sortant.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "InteractionEmailSortantDTO"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerInteractionResponse",
+          "status_codes": [
+            201,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Messages",
+              "operation": "UPSERT",
+              "note": "Le contenu détaillé du message est porté par les tables de messagerie CRM."
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "3883.merlin.interactions*",
+              "operation": "PUBLISH",
+              "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/interactions/emailEntrant",
+          "method": "POST",
+          "description": "Crée une interaction de type email entrant.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "InteractionEmailEntrantDTO"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerInteractionResponse",
+          "status_codes": [
+            201,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Messages",
+              "operation": "UPSERT",
+              "note": "Le contenu détaillé du message est porté par les tables de messagerie CRM."
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "3883.merlin.interactions*",
+              "operation": "PUBLISH",
+              "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/interactions/sms",
+          "method": "POST",
+          "description": "Crée une interaction de type SMS.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "InteractionSmsDTO"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerInteractionResponse",
+          "status_codes": [
+            201,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Messages",
+              "operation": "UPSERT",
+              "note": "Message / payload associé à l’interaction à confirmer selon le type."
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "3883.merlin.interactions*",
+              "operation": "PUBLISH",
+              "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/interactions/outpush",
+          "method": "POST",
+          "description": "Crée une interaction de type push sortant.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "InteractionPushDTO"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerInteractionResponse",
+          "status_codes": [
+            201,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Messages",
+              "operation": "UPSERT",
+              "note": "Message / payload associé à l’interaction à confirmer selon le type."
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "3883.merlin.interactions*",
+              "operation": "PUBLISH",
+              "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/interactions/appelSortant",
+          "method": "POST",
+          "description": "Crée une interaction de type appel sortant.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "InteractionAppelSortantDTO"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerInteractionResponse",
+          "status_codes": [
+            201,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Messages",
+              "operation": "UPSERT",
+              "note": "Message / payload associé à l’interaction à confirmer selon le type."
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "3883.merlin.interactions*",
+              "operation": "PUBLISH",
+              "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/interactions/appelEntrant",
+          "method": "POST",
+          "description": "Crée une interaction de type appel entrant.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "InteractionAppelEntrantDTO"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerInteractionResponse",
+          "status_codes": [
+            201,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Messages",
+              "operation": "UPSERT",
+              "note": "Message / payload associé à l’interaction à confirmer selon le type."
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "3883.merlin.interactions*",
+              "operation": "PUBLISH",
+              "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/interactions",
+          "method": "POST",
+          "description": "Crée une interaction générique via l’ancien DTO.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "InteractionOldDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerInteractionResponse",
+          "status_codes": [
+            201,
+            405,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Messages",
+              "operation": "UPSERT",
+              "note": "Message / payload associé à l’interaction à confirmer selon le type."
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "3883.merlin.interactions*",
+              "operation": "PUBLISH",
+              "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/interactions/{idInteraction}",
+          "method": "DELETE",
+          "description": "Supprime l’interaction cible.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idInteraction"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "DELETE"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/interactions/{idInteraction}/message",
+          "method": "GET",
+          "description": "Retourne le message détaillé d’une interaction email sortante.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idInteraction"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "InteractionPmDto",
+          "status_codes": [
+            200,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Messages",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/interactions/{idInteraction}/status/DONE",
+          "method": "PUT",
+          "description": "Valide une interaction et la passe au statut DONE.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idInteraction"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Interaction",
+              "operation": "UPDATE"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/codepromotion/codepromo",
+          "method": "POST",
+          "description": "Crée un code promotionnel.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "CodePromotionDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "CreerCodePromotionResponse",
+          "status_codes": [
+            201,
+            400,
+            404,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "CodePromo_",
+              "operation": "INSERT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/codepromotion/{codePromo}",
+          "method": "GET",
+          "description": "Vérifie l’existence d’un code promotionnel.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "codePromo"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "ExistanceCodePromotionResponse",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "CodePromo_",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/codepromotion/{codePromo}/{dateValidite}",
+          "method": "GET",
+          "description": "Vérifie l’existence d’un code promotionnel à une date donnée.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "codePromo",
+              "dateValidite"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "ExistanceCodePromotionResponse",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "CodePromo_",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/codepromotion/produit/{codeProduit}",
+          "method": "GET",
+          "description": "Récupère le texte contractuel associé à un produit.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "codeProduit"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "ExistanceCodePromotionResponse",
+          "status_codes": [
+            200,
+            404,
+            422,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "CodePromo_",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/codepromotion/codepromo",
+          "method": "PATCH",
+          "description": "Met à jour la date de fin de validité d’un code promotionnel.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "CodePromotionDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "CodePromotionDto",
+          "status_codes": [
+            200,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "CodePromo_",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "CodePromo_",
+              "operation": "UPDATE"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/codepubs",
+          "method": "GET",
+          "description": "Recherche des codes publicitaires par code, catégorie et sous-catégorie.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "code",
+              "categorie",
+              "sousCategorie"
+            ],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "List<CodePubDTO>",
+          "status_codes": [
+            200,
+            400,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "CodePub_",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/piece",
+          "method": "POST",
+          "description": "Crée ou fusionne des pièces à fournir pour une demande.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "ListePiecesManquantesBean"
+            ],
+            "headers": []
+          },
+          "response_schema": "void",
+          "status_codes": [
+            201,
+            400,
+            404,
+            405,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "PieceAFournir_",
+              "operation": "SELECT",
+              "note": "Recherche d’une pièce existante par demande/type avant fusion éventuelle."
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "PieceAFournir_",
+              "operation": "UPSERT",
+              "note": "Création ou fusion des pièces à fournir."
+            },
+            {
+              "component_id": "db_oracle",
+              "resource": "Demande",
+              "operation": "SELECT",
+              "note": "Référence fonctionnelle à la demande liée à la pièce."
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/piece/{idPieceAFournir}",
+          "method": "DELETE",
+          "description": "Supprime une pièce à fournir.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "idPieceAFournir"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "PieceAFournir_",
+              "operation": "DELETE"
+            }
+          ]
+        },
+        {
+          "path": "/customrestapi/referentiel/nameReferenciel/{nameReferentiel}",
+          "method": "GET",
+          "description": "Retourne les valeurs d’un référentiel métier.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [
+              "nameReferentiel"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "List<RefValDTO>",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_oracle",
+              "resource": "Référentiel métier",
+              "operation": "SELECT",
+              "note": "Nom de référentiel dynamique transmis dans l’URL ; table physique à confirmer."
+            }
+          ]
+        }
+      ],
+      "deployment": {
+        "containerized": true,
+        "platform": "Docker",
+        "ci_cd": "GitLab CI"
+      }
+    },
+    {
+      "id": "db_oracle",
+      "label": "Oracle",
+      "description": "Base Oracle principale de Merlin / E-DEAL CRM. Elle stocke les personnes, entreprises, demandes, opportunités, interactions, pièces justificatives et tables métier complémentaires exploitées par l’API REST et le moteur CRM.",
+      "type": "db",
+      "layer": "Data",
+      "technology": "Oracle 19c",
+      "url": "${DATASOURCE_URL}",
+      "port": 1521,
+      "consumed_via": "Frontline ORM + OracleDataSource + SQL natif",
+      "tables": [
+        {
+          "name": "Base",
+          "purpose": "Table de contrôle/présence utilisée pour les vérifications de connexion de la plateforme Frontline."
+        },
+        {
+          "name": "Person",
+          "purpose": "Référentiel principal des personnes, prospects et clients."
+        },
+        {
+          "name": "Enterprise",
+          "purpose": "Référentiel des entreprises clientes ou prospects B2B."
+        },
+        {
+          "name": "Demande",
+          "purpose": "Dossiers et demandes métier, avec leur cycle de vie et leurs statuts."
+        },
+        {
+          "name": "Opportunity",
+          "purpose": "Opportunités commerciales et souscriptions en cours."
+        },
+        {
+          "name": "Interaction",
+          "purpose": "Historique des interactions client et tâches de suivi."
+        },
+        {
+          "name": "Messages",
+          "purpose": "Contenu des messages liés aux interactions, notamment pour les échanges PM/Kiamo."
+        },
+        {
+          "name": "Attachment",
+          "purpose": "Pièces jointes et contenus binaires associés aux objets CRM."
+        },
+        {
+          "name": "PieceAFournir_",
+          "purpose": "Pièces justificatives attendues ou reçues dans les dossiers."
+        },
+        {
+          "name": "CodePromo_",
+          "purpose": "Codes promotionnels, libellés et périodes de validité."
+        },
+        {
+          "name": "CodePub_",
+          "purpose": "Codes publicité et classifications de campagnes."
+        },
+        {
+          "name": "AlerteFTO_",
+          "purpose": "Alertes métier rattachées aux personnes et entreprises."
+        },
+        {
+          "name": "FTOHistory_",
+          "purpose": "Historique métier Fortuneo, utilisé notamment pour les retours PM."
+        },
+        {
+          "name": "HistoriqueSuppression_",
+          "purpose": "Traçabilité des opérations de suppression et de purge."
+        },
+        {
+          "name": "HistoriqueClientSalarie_",
+          "purpose": "Historisation spécifique du segment client salarié."
+        }
+      ]
+    },
+    {
+      "id": "mq_kafka",
+      "label": "Kafka",
+      "description": "Bus d’événements Kafka utilisé par Merlin pour publier les synchronisations d’interactions CRM et de consentements personnes.",
+      "type": "mq",
+      "layer": "Data",
+      "technology": "Apache Kafka + spring-kafka 3.2.3",
+      "url": "${KAFKA_BOOTSTRAP}",
+      "consumed_via": "KafkaTemplate",
+      "note": "Topics détectés dans kafka.properties et dans les jobs métier : 3883.merlin.interactions*, 3883.merlin.interactions.noreply, 3883.merlin.consents.21*."
+    },
+    {
+      "id": "arkea_cas",
+      "label": "Arkéa CAS SSO",
+      "type": "iam",
+      "layer": "External",
+      "technology": "CAS SSO",
+      "url": "${CAS_URL}",
+      "consumed_via": "GicmCASFilter",
+      "endpoints": [
+        {
+          "path": "/login",
+          "method": "GET",
+          "description": "Point d’entrée de l’authentification SSO CAS pour l’ouverture de session web."
+        },
+        {
+          "path": "/serviceValidate",
+          "method": "GET",
+          "description": "Validation du ticket CAS côté application web après authentification."
+        },
+        {
+          "path": "/logout",
+          "method": "GET",
+          "description": "Fermeture de session SSO côté CAS."
+        }
+      ],
+      "used_by": [
+        "edeal_parent"
+      ],
+      "description": "Fournisseur d’authentification SSO CAS utilisé par l’interface web E-DEAL/Merlin via GicmCASFilter ; l’application web est protégée par session CAS, à l’exception des endpoints /customrestapi/* explicitement exclus du filtre."
+    }
+  ],
+  "connections": [
+    {
+      "id": "isicrm_backend_to_crm_api",
+      "from": "isicrm_backend",
+      "to": "crm_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Façade REST principale vers Merlin/Edeal pour les parcours personnes, demandes, opportunités, interactions et codes promotionnels.",
+      "client": "OpenFeign (OkHttp + Jackson)",
+      "flow": "ISI-CRM → CRM Custom REST API pour lecture/écriture métier côté Merlin"
+    },
+    {
+      "id": "isicrm_backend_to_dms_api",
+      "from": "isicrm_backend",
+      "to": "dms_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Utilisée pour déclencher les impressions automatiques et les traitements documentaires liés aux parcours d’éditique.",
+      "client": "OpenFeign (OkHttp + Jackson)",
+      "flow": "ISI-CRM → DMS pour création de demandes d’impression"
+    },
+    {
+      "id": "isicrm_backend_to_nba_api",
+      "from": "isicrm_backend",
+      "to": "nba_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Consommée pour récupérer des recommandations métier et Next Best Actions dans la vision conseiller.",
+      "client": "OpenFeign (OkHttp + Jackson)",
+      "flow": "ISI-CRM → NBA API pour enrichissement de contexte commercial"
+    },
+    {
+      "id": "isicrm_backend_to_flowdistribution_api",
+      "from": "isicrm_backend",
+      "to": "flowdistribution_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Permet de consulter des scores ou règles de distribution pour prioriser certains parcours et flux métier.",
+      "client": "OpenFeign (OkHttp + Jackson)",
+      "flow": "ISI-CRM → service de distribution/scoring de flux"
+    },
+    {
+      "id": "isicrm_backend_to_sponsorship_api",
+      "from": "isicrm_backend",
+      "to": "sponsorship_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Interrogée pour enrichir les dossiers client avec les informations de parrainage et de relation sponsor/filleul.",
+      "client": "OpenFeign (OkHttp + Jackson)",
+      "flow": "ISI-CRM → Sponsorship API pour données de parrainage"
+    },
+    {
+      "id": "isicrm_backend_to_vault_api",
+      "from": "isicrm_backend",
+      "to": "vault_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Utilisée pour récupérer des secrets techniques ou clés applicatives nécessaires aux intégrations sortantes.",
+      "client": "OpenFeign (OkHttp + Jackson)",
+      "flow": "ISI-CRM → coffre de secrets Vault avant appels sécurisés"
+    },
+    {
+      "id": "isicrm_backend_to_client_api",
+      "from": "isicrm_backend",
+      "to": "client_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "API transverse consultée pour les certifications KYC et certaines mises à jour de statut client, comme la purge.",
+      "client": "OpenFeign (OkHttp + Jackson)",
+      "flow": "ISI-CRM → Client API pour consultation/mise à jour d’informations client transverses"
+    },
+    {
+      "id": "isicrm_backend_to_security_api",
+      "from": "isicrm_backend",
+      "to": "security_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Supporte les parcours d’authentification forte : recherche de devices, création d’opérations et consultation de leur statut.",
+      "client": "OpenFeign (OkHttp + Jackson)",
+      "flow": "ISI-CRM → Security API pour opérations SCA et devices enrôlés"
+    },
+    {
+      "id": "isicrm_backend_to_security_proxy_api",
+      "from": "isicrm_backend",
+      "to": "security_proxy_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Proxy OAuth appelé pour obtenir un jeton technique avant certains appels vers les APIs de sécurité, cashback ou assurance.",
+      "client": "OpenFeign (OkHttp + Jackson)",
+      "flow": "ISI-CRM → proxy OAuth → récupération d’un token technique pour appels sécurisés"
+    },
+    {
+      "id": "isicrm_backend_to_gesparam_api",
+      "from": "isicrm_backend",
+      "to": "gesparam_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Source de référence des tables de paramétrage métier et de transcodification, relue en cas de cache miss Redis.",
+      "client": "OpenFeign (OkHttp + Jackson)",
+      "flow": "ISI-CRM → Gesparam → cache Redis éventuel des référentiels"
+    },
+    {
+      "id": "isicrm_backend_to_cashback_api",
+      "from": "isicrm_backend",
+      "to": "cashback_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Consultée pour récupérer le contexte cashback d’un client après obtention d’un jeton technique via le proxy sécurité.",
+      "client": "OpenFeign (OkHttp + Jackson)",
+      "flow": "ISI-CRM → proxy OAuth → Cashback API pour contexte utilisateur"
+    },
+    {
+      "id": "isicrm_backend_to_investorprofile_api",
+      "from": "isicrm_backend",
+      "to": "investorprofile_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Intervient dans les parcours PER/épargne pour enrichir les dossiers avec le profil investisseur du client.",
+      "client": "OpenFeign (OkHttp + Jackson)",
+      "flow": "ISI-CRM → Investor Profile API pour profilage investisseur"
+    },
+    {
+      "id": "isicrm_backend_to_lifeinsurance_api",
+      "from": "isicrm_backend",
+      "to": "lifeinsurance_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Utilisée dans les cas PER/assurance vie pour récupérer le détail des comptes et contrats d’épargne longue.",
+      "client": "OpenFeign (OkHttp + Jackson)",
+      "flow": "ISI-CRM → Life Insurance API pour détails de compte/contrat"
+    },
+    {
+      "id": "isicrm_backend_to_account_api",
+      "from": "isicrm_backend",
+      "to": "account_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Point d’accès transverse aux informations consolidées de comptes, en complément des services cœur historiques.",
+      "client": "OpenFeign (OkHttp + Jackson)",
+      "flow": "ISI-CRM → Account API pour données consolidées de comptes"
+    },
+    {
+      "id": "isicrm_backend_to_webstore_service",
+      "from": "isicrm_backend",
+      "to": "webstore_service",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Accès aux documents et pièces stockés dans le WebStore via un proxy servlet HTTP.",
+      "client": "ProxyServlet",
+      "flow": "ISI-CRM → WebStore pour consultation de documents et pièces jointes"
+    },
+    {
+      "id": "isicrm_backend_to_panier_thrift",
+      "from": "isicrm_backend",
+      "to": "panier_thrift",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Services Thrift legacy utilisés pour les données personne, compte, adresse et certains besoins CRM historiques.",
+      "client": "fortuneo-thrift-client",
+      "flow": "ISI-CRM → Panier Thrift pour données cœur client/compte"
+    },
+    {
+      "id": "isicrm_backend_to_backend_thrift",
+      "from": "isicrm_backend",
+      "to": "backend_thrift",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Services Thrift backend mobilisés pour les opérations bancaires, la sécurité forte, la génération PDF et les traitements cœur non exposés en REST.",
+      "client": "fortuneo-thrift-client",
+      "flow": "ISI-CRM → Backend Thrift pour opérations cœur et services techniques"
+    },
+    {
+      "id": "isicrm_backend_to_pacman_thrift",
+      "from": "isicrm_backend",
+      "to": "pacman_thrift",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Source legacy spécialisée pour les opérations, comptes, contrats, cartes, livrets et crédits immobiliers.",
+      "client": "fortuneo-thrift-client",
+      "flow": "ISI-CRM → Pacman Thrift pour historique/opérations/contrats"
+    },
+    {
+      "id": "isicrm_backend_to_souscriptionback_thrift",
+      "from": "isicrm_backend",
+      "to": "souscriptionback_thrift",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Back-office Thrift de souscription utilisé pour certains traitements immobiliers et données de souscripteur.",
+      "client": "fortuneo-thrift-client",
+      "flow": "ISI-CRM → Souscription Back Thrift pour dossiers de souscription"
+    },
+    {
+      "id": "isicrm_backend_to_custkn_thrift",
+      "from": "isicrm_backend",
+      "to": "custkn_thrift",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Utilisé pour récupérer des informations client et de profil investisseur, notamment dans les parcours de plafonds et d’épargne.",
+      "client": "fortuneo-thrift-client",
+      "flow": "ISI-CRM → CustKN Thrift pour infos client et profil investisseur"
+    },
+    {
+      "id": "isicrm_backend_to_redis_cache",
+      "from": "isicrm_backend",
+      "to": "redis_cache",
+      "protocol": "Redis",
+      "authenticated": false,
+      "description": "ISI-CRM utilise Redis Sentinel comme cache technique pour éviter des appels répétés aux tables de paramétrage Gesparam et accélérer la résolution des transcodifications métier.",
+      "client": "JedisSentinelPool",
+      "flow": "API ISI-CRM → lecture/écriture cache Redis → fallback Gesparam sur cache miss",
+      "operations": [
+        "GET",
+        "SET",
+        "EXPIRE"
+      ],
+      "cache_strategy": "Cache-aside"
+    },
+    {
+      "id": "isicrm_backend_to_ibm_mq",
+      "from": "isicrm_backend",
+      "to": "ibm_mq",
+      "protocol": "JMS",
+      "authenticated": true,
+      "description": "ISI-CRM échange des événements CRM et des synchronisations asynchrones via IBM MQ/JMS.",
+      "client": "JMS",
+      "flow": "ISI-CRM ↔ broker IBM MQ pour publication et consommation d’événements métier",
+      "operations": [
+        "PUBLISH",
+        "SUBSCRIBE"
+      ],
+      "note": "Queues observées : 3883.PANIER_ISICRM.EVENEMENTCRM.21, 3883.CREDITCONSO_ISICRM.EVENEMENTCRM.21, 3883.CRMEVENTWEBHOOK_ISICRM.EVENEMENTCRM.21, 3883.PERSONSYNC_ISICRM.EVENEMENTCRM.21, 3883.KYCSYNC_ISICRM.EVENEMENTCRM.21."
+    },
+    {
+      "id": "isicrm_backend_to_kafka_cluster",
+      "from": "isicrm_backend",
+      "to": "kafka_cluster",
+      "protocol": "Kafka",
+      "authenticated": true,
+      "description": "ISI-CRM publie et consomme des événements d’intégration sur Kafka, notamment pour la synchronisation métier et certains workflows contestation.",
+      "client": "KafkaTemplate + @KafkaListener",
+      "flow": "ISI-CRM → topics Kafka d’intégration ; Kafka → ISI-CRM pour consommation événementielle",
+      "operations": [
+        "PUBLISH",
+        "SUBSCRIBE"
+      ],
+      "note": "Producer détecté vers 3883.isi-crm.EventSync.21 ; consumer détecté sur 1C36.contestationwkfapi.generic.21."
+    },
+    {
+      "id": "edeal_parent_to_db_oracle",
+      "from": "edeal_parent",
+      "to": "db_oracle",
+      "protocol": "JDBC",
+      "authenticated": true,
+      "description": "Le backend E-DEAL/Merlin s’appuie sur Oracle comme persistance principale pour les personnes, entreprises, demandes, opportunités, interactions, pièces et référentiels métier.",
+      "client": "Frontline ORM + OracleDataSource + SQL natif",
+      "flow": "API /customrestapi → ORM/SQL Frontline → base Oracle Merlin"
+    },
+    {
+      "id": "edeal_parent_to_mq_kafka",
+      "from": "edeal_parent",
+      "to": "mq_kafka",
+      "protocol": "Kafka",
+      "authenticated": true,
+      "description": "Le backend E-DEAL publie des événements Kafka de synchronisation des interactions CRM et des consentements.",
+      "client": "KafkaTemplate",
+      "flow": "E-DEAL/Merlin → topics Kafka de synchronisation",
+      "operations": [
+        "PUBLISH"
+      ],
+      "note": "Topics détectés : 3883.merlin.interactions*, 3883.merlin.interactions.noreply, 3883.merlin.consents.21*."
+    },
+    {
+      "id": "edeal_parent_to_arkea_cas",
+      "from": "edeal_parent",
+      "to": "arkea_cas",
+      "protocol": "CAS/HTTPS",
+      "authenticated": true,
+      "description": "L’interface web E-DEAL/Merlin s’appuie sur Arkéa CAS pour l’authentification SSO via GicmCASFilter ; cette protection concerne les écrans web et non les endpoints /customrestapi/* exclus du filtre.",
+      "client": "GicmCASFilter",
+      "flow": "Navigateur / E-DEAL web → CAS → validation de ticket → session applicative Merlin",
+      "note": "Connexion de sécurité applicable au périmètre web de l’application ; les routes /customrestapi/* sont explicitement exclues du filtre CAS."
+    },
+    {
+      "id": "isicrm_backend_to_edeal_parent",
+      "from": "isicrm_backend",
+      "to": "edeal_parent",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "ISI-CRM consomme directement les endpoints /customrestapi exposés par E-DEAL/Merlin pour les parcours personnes, demandes, opportunités, interactions et codes promotionnels.",
+      "client": "OpenFeign (OkHttp + Jackson)",
+      "flow": "ISI-CRM → E-DEAL/Merlin /customrestapi pour lecture/écriture métier",
+      "note": "Cette connexion représente le lien applicatif réel entre les deux backends. Le composant crm_api modélise la façade REST consommée ; si souhaité, il pourra être consolidé avec edeal_parent."
+    }
+  ],
+  "flow_summary": {
+    "technologies_count": 16,
+    "backend_endpoints": 96,
+    "frontend_routes": 0,
+    "external_services": 20
+  }
+}

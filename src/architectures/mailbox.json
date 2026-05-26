@@ -1,0 +1,1891 @@
+{
+  "architecture": "Mailbox API",
+  "type": "FULLSTACK",
+  "version": "0.1.0",
+  "lastUpdated": "2026-05-20",
+  "description": "API métier de gestion de messagerie Fortuneo pour les clients et conseillers : consultation, création, suivi de messages, modèles, pièces jointes et listes de destinataires.",
+  "layers": [
+    {
+      "name": "Frontend",
+      "color": "#E3F2FD",
+      "description": "Couche présentation — interfaces utilisateur, SPA, MFE"
+    },
+    {
+      "name": "Backend",
+      "color": "#FFF3E0",
+      "description": "Couche métier — API REST, services, traitements"
+    },
+    {
+      "name": "Data",
+      "color": "#F3E5F5",
+      "description": "Couche persistance — bases de données, cache, files"
+    },
+    {
+      "name": "External",
+      "color": "#E8F5E9",
+      "description": "Services externes / tiers — APIs partenaires, IAM, monitoring"
+    }
+  ],
+  "components": [
+    {
+      "id": "backend_mailbox_api",
+      "label": "Mailbox API",
+      "type": "backend",
+      "layer": "Backend",
+      "technology": "Java 25 + Spring Boot 4.0.1 + Jersey (JAX-RS) + OpenFeign",
+      "url": "${API_URL}",
+      "port": 8080,
+      "authentication": {
+        "type": "JWT + CAS habilitations",
+        "provider": "Arkéa shared security",
+        "token_format": "Authorization: Bearer <JWT>",
+        "token_expiry": "À confirmer",
+        "roles_permissions": "AuthenticationRequired + CasHabilitations(MAILBOX:100/200)",
+        "note": "Certain flux propagent aussi le header Authentication vers des services aval."
+      },
+      "endpoints": [
+        {
+          "path": "/api/v1/check",
+          "method": "GET",
+          "description": "Vérifier l'état de disponibilité du service.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200
+          ],
+          "validation": "⚠️ NON VALIDÉ"
+        },
+        {
+          "path": "/api/v1/app-params",
+          "method": "GET",
+          "description": "Récupérer les paramètres applicatifs et les informations utilisateur pour les conseillers.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "AppParamsDto",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "third_party_ws_annuaire",
+              "resource": "/wsannuaire/api/v1/me/person",
+              "operation": "GET"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/client/attachments/{id}",
+          "method": "GET",
+          "description": "Télécharger une pièce jointe accessible au client authentifié.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "id"
+            ],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "application/octet-stream",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_FILE",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "service_s3_attachments",
+              "resource": "PJ_OUT/{attachmentId}",
+              "operation": "GET"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/client/messages/auto/{id}",
+          "method": "GET",
+          "description": "Consulter un message automatique client par identifiant.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "id"
+            ],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "AutoMessageDto",
+          "status_codes": [
+            200,
+            401,
+            403,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "UPDATE",
+              "note": "Marquage lu si TM_STP_LEC absent"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_FILE",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/client/messages/manual/{id}",
+          "method": "GET",
+          "description": "Consulter un message manuel client par identifiant.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "id"
+            ],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "ManualMessageDto",
+          "status_codes": [
+            200,
+            401,
+            403,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "UPDATE",
+              "note": "Marquage lu pour message non bloquant avec instance existante"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "INSERT",
+              "note": "Création d'instance pour destinataire ALL sans instance existante"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/client/messages",
+          "method": "GET",
+          "description": "Lister les messages du client avec filtres et pagination.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "mention",
+              "publicationType",
+              "onlyUnread",
+              "pageNumber",
+              "pageSize"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "SliceClientMessageDto",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "cache_redis",
+              "resource": "clientArrivalDate::<personNumber>",
+              "operation": "GET"
+            },
+            {
+              "component_id": "cache_redis",
+              "resource": "clientArrivalDate::<personNumber>",
+              "operation": "SET",
+              "note": "Alimentation au premier appel si cache miss"
+            },
+            {
+              "component_id": "third_party_client_api",
+              "resource": "/private/persons/me/customer-date",
+              "operation": "GET"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/client/messages/unread",
+          "method": "GET",
+          "description": "Compter les messages non lus du client.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "publicationType"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "ClientMessageStatusDto",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "cache_redis",
+              "resource": "clientArrivalDate::<personNumber>",
+              "operation": "GET"
+            },
+            {
+              "component_id": "cache_redis",
+              "resource": "clientArrivalDate::<personNumber>",
+              "operation": "SET",
+              "note": "Alimentation au premier appel si cache miss"
+            },
+            {
+              "component_id": "third_party_client_api",
+              "resource": "/private/persons/me/customer-date",
+              "operation": "GET"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/client/messages/auto/validate",
+          "method": "POST",
+          "description": "Valider un message automatique bloquant côté client.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "id"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "Response",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "UPDATE"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/client/messages/manual/validate",
+          "method": "POST",
+          "description": "Valider un message manuel bloquant côté client.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "id"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "Response",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "UPDATE"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "INSERT",
+              "note": "Création d'instance pour destinataire ALL sans instance existante"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/client/messages/auto/remove",
+          "method": "DELETE",
+          "description": "Marquer des messages automatiques comme supprimés côté client.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "ids"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "Response",
+          "status_codes": [
+            204,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "UPDATE"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/client/messages/manual/remove",
+          "method": "DELETE",
+          "description": "Marquer des messages manuels comme supprimés côté client.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "ids"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "Response",
+          "status_codes": [
+            204,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "UPDATE"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "INSERT",
+              "note": "Création d'instance supprimée pour destinataire ALL sans instance existante"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/client/messages/manual/{id}/delay",
+          "method": "POST",
+          "description": "Différer la lecture d'un message manuel client.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "id"
+            ],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "Response",
+          "status_codes": [
+            204,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "UPDATE"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/messages/manual/list",
+          "method": "POST",
+          "description": "Rechercher les messages manuels visibles par les conseillers.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "pageNumber",
+              "pageSize"
+            ],
+            "path": [],
+            "body": [
+              "SearchMessageCriteriaDto"
+            ],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "Slice<ManualMessageDto>",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "SELECT",
+              "note": "Utilisé si filtre personNumber dans la recherche"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/messages/auto/list",
+          "method": "POST",
+          "description": "Rechercher les messages automatiques visibles par les conseillers.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "pageNumber",
+              "pageSize"
+            ],
+            "path": [],
+            "body": [
+              "SearchMessageCriteriaDto"
+            ],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "Slice<AutoMessageDto>",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/messages/manual",
+          "method": "POST",
+          "description": "Créer un message manuel conseiller.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "ManualMessageDto"
+            ],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "ManualMessageDto",
+          "status_codes": [
+            201,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_person_oracle",
+              "resource": "T38PRCT",
+              "operation": "SELECT",
+              "note": "Résolution éventuelle des destinataires exprimés en numéros de compte"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "SELECT",
+              "note": "Contrôle de conflit via messages en cours A_ENVOYER/EN_COURS"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "UPDATE",
+              "note": "Changement de statut A_ENVOYER/EN_COURS/ENVOYE"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "DELETE",
+              "note": "Rollback asynchrone en cas d'échec d'envoi"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/messages/auto",
+          "method": "POST",
+          "description": "Créer un message automatique conseiller.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "AutoMessageDto"
+            ],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "AutoMessageDto",
+          "status_codes": [
+            201,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_TEMPLATE",
+              "operation": "SELECT",
+              "note": "Chargement éventuel du template si templateCode renseigné"
+            },
+            {
+              "component_id": "db_person_oracle",
+              "resource": "T38PRCT",
+              "operation": "SELECT",
+              "note": "Résolution éventuelle d'un destinataire exprimé en numéro de compte"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_FILE",
+              "operation": "INSERT",
+              "note": "Une entrée par pièce jointe ajoutée"
+            },
+            {
+              "component_id": "service_s3_attachments",
+              "resource": "PJ_OUT/{attachmentId}",
+              "operation": "PUT"
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "${spring.kafka.topics.significantMessages.id}",
+              "operation": "PUBLISH",
+              "note": "Si template important / notifyClient"
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "${spring.kafka.topics.attachmentMessages.id}",
+              "operation": "PUBLISH",
+              "note": "Si le message contient des pièces jointes"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/messages/manual/{id}/infos",
+          "method": "GET",
+          "description": "Récupérer les informations détaillées d'un message manuel.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "id"
+            ],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "MessageInfoDto",
+          "status_codes": [
+            200,
+            401,
+            403,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/messages/manual/{id}",
+          "method": "PATCH",
+          "description": "Modifier un message manuel existant.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "id"
+            ],
+            "body": [
+              "ManualMessagePatch"
+            ],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "Response",
+          "status_codes": [
+            204,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "third_party_ws_annuaire",
+              "resource": "/wsannuaire/api/v1/me/person",
+              "operation": "GET",
+              "note": "Contrôle des droits par équipe pour niveau 200"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "UPDATE"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "UPDATE",
+              "note": "Propagation asynchrone de la mise à jour sur les instances"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/messages/auto/{id}/infos",
+          "method": "GET",
+          "description": "Récupérer les informations détaillées d'un message automatique.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "id"
+            ],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "MessageInfoDto",
+          "status_codes": [
+            200,
+            401,
+            403,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/messages/{messageType}/{id}/recipients",
+          "method": "GET",
+          "description": "Exporter la liste CSV des destinataires d'un message.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "messageType",
+              "id"
+            ],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "text/csv",
+          "status_codes": [
+            200,
+            401,
+            403,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "SELECT",
+              "note": "Si messageType=manual"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "SELECT",
+              "note": "Si messageType=manual"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "SELECT",
+              "note": "Si messageType=auto"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/messages/{messageType}/{id}/report",
+          "method": "GET",
+          "description": "Exporter le rapport CSV d'un message.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "messageType",
+              "id"
+            ],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "text/csv",
+          "status_codes": [
+            200,
+            401,
+            403,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "SELECT",
+              "note": "Si messageType=manual"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_INSTANCE_MESSAGE",
+              "operation": "SELECT",
+              "note": "Si messageType=manual"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "SELECT",
+              "note": "Si messageType=auto"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/messages/manual/remove",
+          "method": "DELETE",
+          "description": "Marquer des messages manuels comme supprimés côté conseiller.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "ids"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "Response",
+          "status_codes": [
+            204,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "third_party_ws_annuaire",
+              "resource": "/wsannuaire/api/v1/me/person",
+              "operation": "GET",
+              "note": "Contrôle des droits par équipe pour niveau 200"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGES",
+              "operation": "UPDATE"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/messages/auto/remove",
+          "method": "DELETE",
+          "description": "Marquer des messages automatiques comme supprimés côté conseiller.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "ids"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "Response",
+          "status_codes": [
+            204,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "third_party_ws_annuaire",
+              "resource": "/wsannuaire/api/v1/me/person",
+              "operation": "GET",
+              "note": "Contrôle des droits par équipe pour niveau 200"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "UPDATE"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/templates/list",
+          "method": "POST",
+          "description": "Rechercher les modèles de messages.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "pageNumber",
+              "pageSize"
+            ],
+            "path": [],
+            "body": [
+              "SearchTemplateCriteriaDto"
+            ],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "Slice<TemplateDto>",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_TEMPLATE",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/templates/list",
+          "method": "GET",
+          "description": "Lister les noms des modèles disponibles.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "TemplateLiteDto[]",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_TEMPLATE",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/templates",
+          "method": "POST",
+          "description": "Créer un modèle de message.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "TemplateDto"
+            ],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "TemplateDto",
+          "status_codes": [
+            201,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_TEMPLATE",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_TEMPLATE",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/templates/{templateId}",
+          "method": "POST",
+          "description": "Mettre à jour un modèle de message existant.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "templateId"
+            ],
+            "body": [
+              "TemplateDto"
+            ],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "TemplateDto",
+          "status_codes": [
+            200,
+            401,
+            403,
+            404,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_TEMPLATE",
+              "operation": "UPDATE"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_TEMPLATE",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/templates/{templateId}",
+          "method": "GET",
+          "description": "Consulter un modèle de message par identifiant.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "templateId"
+            ],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "TemplateDto",
+          "status_codes": [
+            200,
+            401,
+            403,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_TEMPLATE",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/templates",
+          "method": "GET",
+          "description": "Consulter un modèle de message par code.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "code"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "TemplateDto",
+          "status_codes": [
+            200,
+            401,
+            403,
+            404,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_TEMPLATE",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/templates/check-code/{code}",
+          "method": "GET",
+          "description": "Vérifier l'existence d'un code modèle.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "code"
+            ],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "Boolean",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_TEMPLATE",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/templates/remove",
+          "method": "DELETE",
+          "description": "Supprimer logiquement des modèles de messages.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "ids"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "Response",
+          "status_codes": [
+            204,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_TEMPLATE",
+              "operation": "SELECT",
+              "note": "Contrôle du propriétaire avant suppression"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_TEMPLATE",
+              "operation": "DELETE"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/advisor/recipientList/upload",
+          "method": "POST",
+          "description": "Charger un fichier CSV de liste de destinataires et retourner les colonnes extraites.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "MultipartFile"
+            ],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "Map<String,String>",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ"
+        },
+        {
+          "path": "/api/v1/batch/messages/auto",
+          "method": "POST",
+          "description": "Créer un message automatique via le flux batch.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "AutoMessageDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "AutoMessageDto",
+          "status_codes": [
+            201,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_TEMPLATE",
+              "operation": "SELECT",
+              "note": "Chargement éventuel du template si templateCode renseigné"
+            },
+            {
+              "component_id": "db_person_oracle",
+              "resource": "T38PRCT",
+              "operation": "SELECT",
+              "note": "Résolution éventuelle d'un destinataire exprimé en numéro de compte"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_AUTO",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_mailbox_oracle",
+              "resource": "T38_MESSAGE_FILE",
+              "operation": "INSERT",
+              "note": "Une entrée par pièce jointe ajoutée"
+            },
+            {
+              "component_id": "service_s3_attachments",
+              "resource": "PJ_OUT/{attachmentId}",
+              "operation": "PUT"
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "${spring.kafka.topics.significantMessages.id}",
+              "operation": "PUBLISH",
+              "note": "Si template important / notifyClient"
+            },
+            {
+              "component_id": "mq_kafka",
+              "resource": "${spring.kafka.topics.attachmentMessages.id}",
+              "operation": "PUBLISH",
+              "note": "Si le message contient des pièces jointes"
+            }
+          ]
+        }
+      ],
+      "deployment": {
+        "containerized": true,
+        "platform": "Docker",
+        "ci_cd": "GitLab CI"
+      }
+    },
+    {
+      "id": "db_mailbox_oracle",
+      "label": "Mailbox Oracle DB",
+      "type": "db",
+      "layer": "Data",
+      "technology": "Oracle Database",
+      "url": "${cloud_oracle_database_mailbox_url}",
+      "port": 1521,
+      "consumed_via": "Spring JDBC / NamedParameterJdbcTemplate",
+      "tables": [
+        {
+          "name": "T38_MESSAGES",
+          "purpose": "Messages manuels gérés par les conseillers"
+        },
+        {
+          "name": "T38_MESSAGE_AUTO",
+          "purpose": "Messages automatiques destinés aux clients"
+        },
+        {
+          "name": "T38_INSTANCE_MESSAGE",
+          "purpose": "Instances client des messages et statuts de lecture/suppression"
+        },
+        {
+          "name": "T38_MESSAGE_FILE",
+          "purpose": "Métadonnées des pièces jointes associées aux messages"
+        },
+        {
+          "name": "T38_TEMPLATE",
+          "purpose": "Modèles de messages utilisés par l'application"
+        }
+      ]
+    },
+    {
+      "id": "db_person_oracle",
+      "label": "Person Oracle DB",
+      "type": "db",
+      "layer": "Data",
+      "technology": "Oracle Database",
+      "url": "${cloud_oracle_database_fortuneo_url}",
+      "port": 1521,
+      "consumed_via": "Spring JDBC / NamedParameterJdbcTemplate",
+      "tables": [
+        {
+          "name": "T38PRCT",
+          "purpose": "Correspondance entre numéros de comptes et numéros de personnes"
+        }
+      ]
+    },
+    {
+      "id": "cache_redis",
+      "label": "Redis Cache",
+      "type": "cache",
+      "layer": "Data",
+      "technology": "Redis",
+      "consumed_via": "Spring Cache + Redis",
+      "cached_data": [
+        {
+          "endpoint": "/api/v1/client/messages",
+          "key_pattern": "clientArrivalDate::<personNumber>",
+          "ttl": "86400000ms",
+          "purpose": "Date d'arrivée client mise en cache par numéro de personne"
+        }
+      ]
+    },
+    {
+      "id": "mq_kafka",
+      "label": "Kafka",
+      "type": "mq",
+      "layer": "Data",
+      "technology": "Kafka",
+      "consumed_via": "Spring Kafka / KafkaTemplate",
+      "note": "Topics producteurs détectés : ${spring.kafka.topics.significantMessages.id}, ${spring.kafka.topics.attachmentMessages.id}"
+    },
+    {
+      "id": "third_party_ws_annuaire",
+      "label": "WS Annuaire",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign + OkHttp + Jackson)",
+      "url": "${spring.datasource.annuaire.url}",
+      "consumed_via": "OpenFeign",
+      "endpoints": [
+        {
+          "path": "/wsannuaire/api/v1/me/person",
+          "method": "GET"
+        }
+      ],
+      "used_by": [
+        "backend_mailbox_api"
+      ]
+    },
+    {
+      "id": "third_party_client_api",
+      "label": "Client API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign + OkHttp + Jackson)",
+      "url": "${spring.datasource.clientapi.url}",
+      "consumed_via": "OpenFeign",
+      "endpoints": [
+        {
+          "path": "/private/persons/me/customer-date",
+          "method": "GET"
+        }
+      ],
+      "used_by": [
+        "backend_mailbox_api"
+      ]
+    },
+    {
+      "id": "service_s3_attachments",
+      "label": "S3 Attachment Storage",
+      "type": "service",
+      "layer": "External",
+      "technology": "S3-compatible object storage",
+      "url": "https://${cloud_s3_endpoint}",
+      "consumed_via": "AWS SDK S3 2.39.4",
+      "used_by": [
+        "backend_mailbox_api"
+      ]
+    },
+    {
+      "id": "service_hdfs_staging",
+      "label": "Hadoop HDFS Staging",
+      "type": "service",
+      "layer": "External",
+      "technology": "HTTP file staging",
+      "url": "${cloud_hadoop_staging_out_url}",
+      "consumed_via": "java.net.URL",
+      "used_by": [
+        "backend_mailbox_api"
+      ]
+    },
+    {
+      "id": "monitoring_logstash",
+      "label": "Logstash",
+      "type": "monitoring",
+      "layer": "External",
+      "technology": "Logstash UDP appender",
+      "url": "${LOG4J_HOST}",
+      "consumed_via": "logstash-logback-encoder 9.0",
+      "used_by": [
+        "backend_mailbox_api"
+      ]
+    },
+    {
+      "id": "bo_mailbox",
+      "label": "Bo Mailbox",
+      "type": "frontend",
+      "layer": "Frontend",
+      "technology": "React 19.0.0 + Vite 5.0.11 + @mui/material 6.2.1",
+      "url": "À confirmer",
+      "build_tool": "Vite 5.0.11",
+      "state_management": "@reduxjs/toolkit 2.5.0 (client-state)",
+      "key_dependencies": [
+        "axios 1.7.9",
+        "@fortuneo/fto-bo-security-lib 1.0.15",
+        "@fortuneo/ui 2.1.3",
+        "@sofa/federation 0.3.3"
+      ],
+      "routes": [
+        {
+          "path": "/mailbox/messages",
+          "label": "Messages",
+          "authenticated": true,
+          "description": "Liste paginée des messages manuels ou automatiques avec filtres, export et suppression.",
+          "api_calls": [
+            "GET /api/v1/app-params",
+            "POST /api/v1/advisor/messages/manual/list",
+            "POST /api/v1/advisor/messages/auto/list",
+            "GET /api/v1/advisor/messages/manual/{id}/infos",
+            "DELETE /api/v1/advisor/messages/manual/remove",
+            "DELETE /api/v1/advisor/messages/auto/remove",
+            "GET /api/v1/advisor/messages/{messageType}/{id}/report",
+            "GET /api/v1/advisor/messages/{messageType}/{id}/recipients"
+          ]
+        },
+        {
+          "path": "/mailbox/message/edition",
+          "label": "Édition message",
+          "authenticated": true,
+          "description": "Formulaire de création ou modification d'un message manuel avec choix de template, destinataires et tags.",
+          "api_calls": [
+            "GET /api/v1/app-params",
+            "GET /api/v1/advisor/templates/list",
+            "POST /api/v1/advisor/templates/list",
+            "GET /api/v1/advisor/templates/{templateId}"
+          ]
+        },
+        {
+          "path": "/mailbox/message/valider",
+          "label": "Validation message",
+          "authenticated": true,
+          "description": "Prévisualisation et confirmation d'envoi ou de mise à jour d'un message manuel.",
+          "api_calls": [
+            "GET /api/v1/app-params",
+            "POST /api/v1/advisor/messages/manual",
+            "PATCH /api/v1/advisor/messages/manual/{id}",
+            "POST /api/v1/advisor/messages/manual/list"
+          ]
+        },
+        {
+          "path": "/mailbox/templates",
+          "label": "Templates",
+          "authenticated": true,
+          "description": "Liste paginée des templates avec filtres, duplication et suppression.",
+          "api_calls": [
+            "GET /api/v1/app-params",
+            "POST /api/v1/advisor/templates/list",
+            "POST /api/v1/advisor/templates",
+            "DELETE /api/v1/advisor/templates/remove"
+          ]
+        },
+        {
+          "path": "/mailbox/template/edition",
+          "label": "Édition template",
+          "authenticated": true,
+          "description": "Formulaire de création ou modification de template avec contrôle d'unicité du code.",
+          "api_calls": [
+            "GET /api/v1/app-params",
+            "GET /api/v1/advisor/templates/check-code/{code}"
+          ]
+        },
+        {
+          "path": "/mailbox/template/valider",
+          "label": "Validation template",
+          "authenticated": true,
+          "description": "Prévisualisation et enregistrement d'un template nouveau ou existant.",
+          "api_calls": [
+            "GET /api/v1/app-params",
+            "POST /api/v1/advisor/templates",
+            "POST /api/v1/advisor/templates/{templateId}",
+            "POST /api/v1/advisor/templates/list",
+            "GET /api/v1/advisor/templates/list"
+          ]
+        },
+        {
+          "path": "/mailbox/unauthorized",
+          "label": "Non autorisé",
+          "authenticated": false,
+          "description": "Page d'information affichée quand l'utilisateur n'a pas les habilitations Mailbox.",
+          "api_calls": []
+        }
+      ],
+      "deployment": {
+        "platform": "Arkéa S3",
+        "ci_cd": "GitLab CI + Jenkins"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "bo_mailbox_to_backend_mailbox_api",
+      "from": "bo_mailbox",
+      "to": "backend_mailbox_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "endpoint_mappings": [
+        {
+          "frontend_endpoint": "GET /api/v1/app-params",
+          "backend_endpoint": "/api/v1/app-params",
+          "method": "GET",
+          "frontend_pages": [
+            "/mailbox/messages",
+            "/mailbox/message/edition",
+            "/mailbox/message/valider",
+            "/mailbox/templates",
+            "/mailbox/template/edition",
+            "/mailbox/template/valider"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "POST /api/v1/advisor/messages/manual/list",
+          "backend_endpoint": "/api/v1/advisor/messages/manual/list",
+          "method": "POST",
+          "frontend_pages": [
+            "/mailbox/messages",
+            "/mailbox/message/valider"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "POST /api/v1/advisor/messages/auto/list",
+          "backend_endpoint": "/api/v1/advisor/messages/auto/list",
+          "method": "POST",
+          "frontend_pages": [
+            "/mailbox/messages"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /api/v1/advisor/messages/manual/{id}/infos",
+          "backend_endpoint": "/api/v1/advisor/messages/manual/{id}/infos",
+          "method": "GET",
+          "frontend_pages": [
+            "/mailbox/messages"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "DELETE /api/v1/advisor/messages/manual/remove",
+          "backend_endpoint": "/api/v1/advisor/messages/manual/remove",
+          "method": "DELETE",
+          "frontend_pages": [
+            "/mailbox/messages"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "DELETE /api/v1/advisor/messages/auto/remove",
+          "backend_endpoint": "/api/v1/advisor/messages/auto/remove",
+          "method": "DELETE",
+          "frontend_pages": [
+            "/mailbox/messages"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /api/v1/advisor/messages/{messageType}/{id}/report",
+          "backend_endpoint": "/api/v1/advisor/messages/{messageType}/{id}/report",
+          "method": "GET",
+          "frontend_pages": [
+            "/mailbox/messages"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /api/v1/advisor/messages/{messageType}/{id}/recipients",
+          "backend_endpoint": "/api/v1/advisor/messages/{messageType}/{id}/recipients",
+          "method": "GET",
+          "frontend_pages": [
+            "/mailbox/messages"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /api/v1/advisor/templates/list",
+          "backend_endpoint": "/api/v1/advisor/templates/list",
+          "method": "GET",
+          "frontend_pages": [
+            "/mailbox/message/edition",
+            "/mailbox/template/valider"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "POST /api/v1/advisor/templates/list",
+          "backend_endpoint": "/api/v1/advisor/templates/list",
+          "method": "POST",
+          "frontend_pages": [
+            "/mailbox/message/edition",
+            "/mailbox/templates",
+            "/mailbox/template/valider"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /api/v1/advisor/templates/{templateId}",
+          "backend_endpoint": "/api/v1/advisor/templates/{templateId}",
+          "method": "GET",
+          "frontend_pages": [
+            "/mailbox/message/edition"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "POST /api/v1/advisor/messages/manual",
+          "backend_endpoint": "/api/v1/advisor/messages/manual",
+          "method": "POST",
+          "frontend_pages": [
+            "/mailbox/message/valider"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "PATCH /api/v1/advisor/messages/manual/{id}",
+          "backend_endpoint": "/api/v1/advisor/messages/manual/{id}",
+          "method": "PATCH",
+          "frontend_pages": [
+            "/mailbox/message/valider"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "POST /api/v1/advisor/templates",
+          "backend_endpoint": "/api/v1/advisor/templates",
+          "method": "POST",
+          "frontend_pages": [
+            "/mailbox/templates",
+            "/mailbox/template/valider"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "DELETE /api/v1/advisor/templates/remove",
+          "backend_endpoint": "/api/v1/advisor/templates/remove",
+          "method": "DELETE",
+          "frontend_pages": [
+            "/mailbox/templates"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /api/v1/advisor/templates/check-code/{code}",
+          "backend_endpoint": "/api/v1/advisor/templates/check-code/{code}",
+          "method": "GET",
+          "frontend_pages": [
+            "/mailbox/template/edition"
+          ],
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "POST /api/v1/advisor/templates/{templateId}",
+          "backend_endpoint": "/api/v1/advisor/templates/{templateId}",
+          "method": "POST",
+          "frontend_pages": [
+            "/mailbox/template/valider"
+          ],
+          "status": "✅ MAPPÉ"
+        }
+      ]
+    },
+    {
+      "id": "backend_mailbox_api_to_third_party_ws_annuaire",
+      "from": "backend_mailbox_api",
+      "to": "third_party_ws_annuaire",
+      "protocol": "REST/HTTPS",
+      "authenticated": true
+    },
+    {
+      "id": "backend_mailbox_api_to_third_party_client_api",
+      "from": "backend_mailbox_api",
+      "to": "third_party_client_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true
+    },
+    {
+      "id": "backend_mailbox_api_to_service_s3_attachments",
+      "from": "backend_mailbox_api",
+      "to": "service_s3_attachments",
+      "protocol": "REST/HTTPS",
+      "authenticated": true
+    },
+    {
+      "id": "backend_mailbox_api_to_service_hdfs_staging",
+      "from": "backend_mailbox_api",
+      "to": "service_hdfs_staging",
+      "protocol": "REST/HTTPS",
+      "authenticated": true
+    },
+    {
+      "id": "backend_mailbox_api_to_monitoring_logstash",
+      "from": "backend_mailbox_api",
+      "to": "monitoring_logstash",
+      "protocol": "HTTPS",
+      "authenticated": true
+    },
+    {
+      "id": "backend_mailbox_api_to_db_mailbox_oracle",
+      "from": "backend_mailbox_api",
+      "to": "db_mailbox_oracle",
+      "protocol": "JDBC",
+      "authenticated": true
+    },
+    {
+      "id": "backend_mailbox_api_to_db_person_oracle",
+      "from": "backend_mailbox_api",
+      "to": "db_person_oracle",
+      "protocol": "JDBC",
+      "authenticated": true
+    },
+    {
+      "id": "backend_mailbox_api_to_cache_redis",
+      "from": "backend_mailbox_api",
+      "to": "cache_redis",
+      "protocol": "Redis/Sentinel",
+      "authenticated": true
+    },
+    {
+      "id": "backend_mailbox_api_to_mq_kafka",
+      "from": "backend_mailbox_api",
+      "to": "mq_kafka",
+      "protocol": "Kafka/SSL",
+      "authenticated": true
+    }
+  ]
+}

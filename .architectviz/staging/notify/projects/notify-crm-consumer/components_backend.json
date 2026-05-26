@@ -1,0 +1,45 @@
+[
+  {
+    "id": "backend_notify_crm_consumer",
+    "label": "Notify CRM Consumer Backend",
+    "description": "Consumer Kafka qui écoute les événements Notify livrés puis appelle l’API CRM interne pour créer les événements d’interaction correspondants.",
+    "type": "backend",
+    "layer": "Backend",
+    "technology": "Java 25 + Spring Boot 4.0.1 + Jersey (JAX-RS) + Spring Kafka + OpenFeign",
+    "url": "À confirmer",
+    "port": 8080,
+    "authentication": {
+      "type": "Aucune (endpoints permitAll)",
+      "provider": "Aucun",
+      "token_format": "N/A",
+      "token_expiry": "N/A",
+      "roles_permissions": "Aucun",
+      "note": "La SecurityFilterChain autorise toutes les requêtes; seul l’endpoint de healthcheck HTTP est exposé, le traitement métier principal passe par un consumer Kafka."
+    },
+    "endpoints": [
+      {
+        "path": "/api/v1/check",
+        "method": "GET",
+        "description": "Expose un healthcheck applicatif.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": []
+      }
+    ],
+    "deployment": {
+      "containerized": true,
+      "platform": "Docker",
+      "ci_cd": "GitLab CI"
+    }
+  }
+]

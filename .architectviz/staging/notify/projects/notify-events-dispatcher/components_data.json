@@ -1,0 +1,56 @@
+[
+  {
+    "id": "db_postgres",
+    "label": "PostgreSQL",
+    "description": "Base PostgreSQL du dispatcher utilisée pour stocker les mappings événement → template/canal et les erreurs de traitement rejouables.",
+    "type": "db",
+    "layer": "Data",
+    "technology": "PostgreSQL",
+    "url": "${DATASOURCE_URL}",
+    "port": 5432,
+    "consumed_via": "Spring JDBC",
+    "tables": [
+      {
+        "name": "t38event_mapping_notify",
+        "purpose": "Associe chaque type d'événement aux paramètres de notification à utiliser, notamment canal et template."
+      },
+      {
+        "name": "t38err_notify_disp",
+        "purpose": "Conserve les erreurs de dispatch de notifications afin de permettre leur consultation, leur rejeu et leur suppression."
+      }
+    ]
+  },
+  {
+    "id": "cache_redis",
+    "label": "Redis Cache",
+    "description": "Cache Redis utilisé par notify-events-dispatcher pour mémoriser les paramètres de dispatch et certains jetons OAuth nécessaires aux appels externes.",
+    "type": "cache",
+    "layer": "Data",
+    "technology": "Redis",
+    "url": "${REDIS_URL}",
+    "port": 6379,
+    "consumed_via": "Spring Data Redis",
+    "cached_data": [
+      {
+        "key_pattern": "notif_params::*",
+        "ttl": "10000ms",
+        "purpose": "Mapping des événements vers template/canal chargé depuis la table t38event_mapping_notify."
+      },
+      {
+        "key_pattern": "OAUTH_TOKEN::{team}",
+        "ttl": "À confirmer",
+        "purpose": "Jetons OAuth Cognito mis en cache par équipe pour appeler l'API Notify."
+      }
+    ]
+  },
+  {
+    "id": "mq_kafka",
+    "label": "Kafka",
+    "description": "Cluster Kafka utilisé comme bus d'événements pour consommer les événements métiers entrants déclenchant l'envoi de notifications.",
+    "type": "mq",
+    "layer": "Data",
+    "technology": "Apache Kafka",
+    "url": "${KAFKA_BOOTSTRAP}",
+    "consumed_via": "Spring Kafka"
+  }
+]

@@ -1,0 +1,6 @@
+{
+  "name": "ArchitectViz",
+  "description": "Visualize complex software architectures from JSON. Group components by layers, inspect connections, and explore system flows in an interactive canvas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

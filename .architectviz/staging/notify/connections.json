@@ -1,0 +1,130 @@
+[
+  {
+    "id": "backend_notify_webhook_to_iam_oidc",
+    "from": "backend_notify_webhook",
+    "to": "iam_oidc",
+    "protocol": "OIDC/HTTPS",
+    "authenticated": false,
+    "description": "Le backend webhook s'appuie sur la configuration OIDC de la plateforme pour ses besoins d'authentification fédérée."
+  },
+  {
+    "id": "backend_notify_webhook_to_oauth_api",
+    "from": "backend_notify_webhook",
+    "to": "oauth_api",
+    "protocol": "REST/HTTPS",
+    "authenticated": true,
+    "description": "Le service webhook délègue la vérification des bearer tokens à l'API OAuth."
+  },
+  {
+    "id": "backend_notify_webhook_to_mq_kafka",
+    "from": "backend_notify_webhook",
+    "to": "mq_kafka",
+    "protocol": "Kafka/SSL",
+    "authenticated": true,
+    "description": "Le webhook republie les événements Notify entrants sur Kafka."
+  },
+  {
+    "id": "backend_notify_events_dispatcher_to_iam_oidc",
+    "from": "backend_notify_events_dispatcher",
+    "to": "iam_oidc",
+    "protocol": "OIDC/HTTPS",
+    "authenticated": false,
+    "description": "Le dispatcher référence le provider OIDC commun du SI via la configuration de sécurité partagée."
+  },
+  {
+    "id": "backend_notify_events_dispatcher_to_clientapi_client_api",
+    "from": "backend_notify_events_dispatcher",
+    "to": "clientapi_client_api",
+    "protocol": "REST/HTTPS",
+    "authenticated": true,
+    "description": "Le dispatcher récupère les coordonnées de contact client avant d'envoyer une notification."
+  },
+  {
+    "id": "backend_notify_events_dispatcher_to_cognito_client_api",
+    "from": "backend_notify_events_dispatcher",
+    "to": "cognito_client_api",
+    "protocol": "REST/HTTPS",
+    "authenticated": true,
+    "description": "Le dispatcher obtient des jetons techniques Cognito pour authentifier les appels sortants vers Notify."
+  },
+  {
+    "id": "backend_notify_events_dispatcher_to_notify_client_api",
+    "from": "backend_notify_events_dispatcher",
+    "to": "notify_client_api",
+    "protocol": "REST/HTTPS",
+    "authenticated": true,
+    "description": "Le dispatcher appelle Notify pour créer et envoyer les notifications."
+  },
+  {
+    "id": "backend_notify_events_dispatcher_to_mq_kafka",
+    "from": "backend_notify_events_dispatcher",
+    "to": "mq_kafka",
+    "protocol": "Kafka/SSL",
+    "authenticated": true,
+    "description": "Le dispatcher consomme les événements métiers entrants depuis Kafka."
+  },
+  {
+    "id": "backend_notify_events_dispatcher_to_db_postgres",
+    "from": "backend_notify_events_dispatcher",
+    "to": "db_postgres",
+    "protocol": "JDBC/SSL",
+    "authenticated": true,
+    "description": "Le dispatcher lit les mappings événement → notification et gère les erreurs de traitement en base."
+  },
+  {
+    "id": "backend_notify_events_dispatcher_to_cache_redis",
+    "from": "backend_notify_events_dispatcher",
+    "to": "cache_redis",
+    "protocol": "Redis/Sentinel",
+    "authenticated": true,
+    "description": "Le dispatcher met en cache les mappings de dispatch et certains jetons OAuth techniques dans Redis."
+  },
+  {
+    "id": "backend_notify_records_consumer_to_iam_oidc",
+    "from": "backend_notify_records_consumer",
+    "to": "iam_oidc",
+    "protocol": "OIDC/HTTPS",
+    "authenticated": false,
+    "description": "Le consumer d'archivage référence le provider OIDC commun du SI via la configuration de sécurité partagée."
+  },
+  {
+    "id": "backend_notify_records_consumer_to_mq_kafka",
+    "from": "backend_notify_records_consumer",
+    "to": "mq_kafka",
+    "protocol": "Kafka/SSL",
+    "authenticated": true,
+    "description": "Le consumer d'archivage lit les événements Notify depuis Kafka."
+  },
+  {
+    "id": "backend_notify_records_consumer_to_db_postgres",
+    "from": "backend_notify_records_consumer",
+    "to": "db_postgres",
+    "protocol": "JDBC/SSL",
+    "authenticated": true,
+    "description": "Le consumer d'archivage persiste l'historique des notifications et leurs changements d'état en PostgreSQL."
+  },
+  {
+    "id": "backend_notify_crm_consumer_to_iam_oidc",
+    "from": "backend_notify_crm_consumer",
+    "to": "iam_oidc",
+    "protocol": "OIDC/HTTPS",
+    "authenticated": false,
+    "description": "Le consumer CRM référence le provider OIDC commun du SI via la configuration de sécurité partagée."
+  },
+  {
+    "id": "backend_notify_crm_consumer_to_mq_kafka",
+    "from": "backend_notify_crm_consumer",
+    "to": "mq_kafka",
+    "protocol": "Kafka/SSL",
+    "authenticated": true,
+    "description": "Le consumer CRM lit les événements Notify livrés depuis Kafka."
+  },
+  {
+    "id": "backend_notify_crm_consumer_to_event_api",
+    "from": "backend_notify_crm_consumer",
+    "to": "event_api",
+    "protocol": "REST/HTTPS",
+    "authenticated": true,
+    "description": "Le consumer CRM appelle l'API event pour créer les interactions CRM issues des notifications livrées."
+  }
+]

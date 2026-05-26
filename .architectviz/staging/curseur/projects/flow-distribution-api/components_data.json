@@ -1,0 +1,23 @@
+[
+  {
+    "id": "db_mysql",
+    "label": "MySQL",
+    "type": "db",
+    "layer": "Data",
+    "technology": "MySQL",
+    "url": "${DATASOURCE_URL}",
+    "port": 3306,
+    "consumed_via": "Spring JDBC"
+  },
+  {
+    "id": "cache_redis",
+    "label": "Redis Cache",
+    "type": "cache",
+    "layer": "Data",
+    "technology": "Redis",
+    "url": "${REDIS_URL}",
+    "port": 6379,
+    "consumed_via": "Spring Data Redis",
+    "cached_data": []
+  }
+]

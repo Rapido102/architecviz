@@ -1,0 +1,194 @@
+[
+  {
+    "id": "backend_cegec_api",
+    "label": "CEGEC API",
+    "description": "API CEGEC exposée en Jersey/JAX-RS pour consulter les gestes commerciaux, restituer les paramètres applicatifs et agréger les produits client.",
+    "type": "backend",
+    "layer": "Backend",
+    "technology": "Java 25 + Spring Boot 4.0.3 + Jersey (JAX-RS) + OpenFeign + Spring Data JDBC",
+    "url": "À confirmer",
+    "port": 8080,
+    "authentication": {
+      "type": "JWT via header Authentication",
+      "provider": "WS Habilitation",
+      "token_format": "Authentication: <JWT brut>",
+      "token_expiry": "Porté par le JWT amont ; non contrôlé par l’application",
+      "roles_permissions": "RBAC CEGEC basé sur le niveau d’accès et les structures autorisées renvoyés par WS Habilitation",
+      "note": "Le schéma OpenAPI déclare un header Authentication. Les tests montrent un 401 avec jeton invalide. Les annotations CasHabilitations métier sont encore commentées dans les contrôleurs."
+    },
+    "endpoints": [
+      {
+        "path": "/api/v1/app-params",
+        "method": "GET",
+        "description": "Récupère les paramètres applicatifs et le contexte utilisateur connecté.",
+        "authenticated": true,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [],
+          "headers": [
+            "Authentication"
+          ]
+        },
+        "response_schema": "AppParams",
+        "status_codes": [
+          200,
+          401,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "cache_redis_cegec",
+            "resource": "USER-CONTEXT-*",
+            "operation": "GET",
+            "note": "Lecture cache-aside du contexte utilisateur enrichi."
+          },
+          {
+            "component_id": "cache_redis_cegec",
+            "resource": "USER-CONTEXT-*",
+            "operation": "SET",
+            "note": "Alimentation du cache users avec TTL 10h lors d’un miss."
+          },
+          {
+            "component_id": "iam_ws_habilitation",
+            "resource": "/users/{casId}/access_rights/CEGEC",
+            "operation": "GET"
+          },
+          {
+            "component_id": "service_ws_annuaire",
+            "resource": "/me/person",
+            "operation": "GET"
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/form-params",
+        "method": "GET",
+        "description": "Récupère les paramètres nécessaires au formulaire de création de fiche.",
+        "authenticated": true,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [],
+          "headers": [
+            "Authentication"
+          ]
+        },
+        "response_schema": "FormParams",
+        "status_codes": [
+          200,
+          401,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_mysql_cegec",
+            "resource": "t38gcod",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_mysql_cegec",
+            "resource": "t38categorie_geste",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/client-products/{numeroPersonne}",
+        "method": "GET",
+        "description": "Récupère les comptes et les cartes d’un client à partir de son numéro de personne.",
+        "authenticated": true,
+        "params": {
+          "query": [],
+          "path": [
+            "numeroPersonne"
+          ],
+          "body": [],
+          "headers": [
+            "Authentication"
+          ]
+        },
+        "response_schema": "CustomerInformationResponseDto",
+        "status_codes": [
+          200,
+          400,
+          401,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "service_account_rules_api",
+            "resource": "/accounts",
+            "operation": "GET"
+          },
+          {
+            "component_id": "service_card_api",
+            "resource": "/cards",
+            "operation": "GET"
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/gestes",
+        "method": "GET",
+        "description": "Retourne les derniers gestes d’un client avec filtres par numéro client, date de création et pagination.",
+        "authenticated": true,
+        "params": {
+          "query": [
+            "numeroClient",
+            "creationDate",
+            "page"
+          ],
+          "path": [],
+          "body": [],
+          "headers": [
+            "Authentication"
+          ]
+        },
+        "response_schema": "GesturesResponse",
+        "status_codes": [
+          200,
+          400,
+          401,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_mysql_cegec",
+            "resource": "t38fiches",
+            "operation": "SELECT",
+            "note": "Lecture de la liste paginée, du compteur global et des indicateurs 12 mois depuis la même table."
+          }
+        ]
+      },
+      {
+        "path": "/check",
+        "method": "GET",
+        "description": "Endpoint de healthcheck de l’application.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200
+        ],
+        "validation": "✅ VALID",
+        "data_access": []
+      }
+    ],
+    "deployment": {
+      "containerized": true,
+      "platform": "Docker",
+      "ci_cd": "GitLab CI"
+    }
+  }
+]

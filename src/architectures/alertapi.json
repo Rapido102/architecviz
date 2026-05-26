@@ -1,0 +1,183 @@
+{
+  "architecture": "Alert API",
+  "type": "BACKEND",
+  "version": "0.1.0",
+  "lastUpdated": "2026-05-20",
+  "description": "API qui expose les alertes liées à la mobilité bancaire pour un client authentifié et permet de supprimer l’alerte d’accroche en cours.",
+  "layers": [
+    {
+      "name": "Frontend",
+      "color": "#E3F2FD",
+      "description": "Couche présentation — interfaces utilisateur, SPA, MFE"
+    },
+    {
+      "name": "Backend",
+      "color": "#FFF3E0",
+      "description": "Couche métier — API REST, services, traitements"
+    },
+    {
+      "name": "Data",
+      "color": "#F3E5F5",
+      "description": "Couche persistance — bases de données, cache, files"
+    },
+    {
+      "name": "External",
+      "color": "#E8F5E9",
+      "description": "Services externes / tiers — APIs partenaires, IAM, monitoring"
+    }
+  ],
+  "components": [
+    {
+      "id": "backend_alert_api",
+      "label": "Alert API",
+      "type": "backend",
+      "layer": "Backend",
+      "technology": "Java 25 + Spring Boot 3.5.8 + Jersey (JAX-RS) + OpenFeign",
+      "url": "${ALERT_API_URL}",
+      "port": 8080,
+      "authentication": {
+        "type": "JWT Bearer Token",
+        "provider": "À confirmer",
+        "token_format": "Authorization: Bearer <JWT>",
+        "token_expiry": "À confirmer",
+        "roles_permissions": "À confirmer",
+        "note": "Les routes métier utilisent @AuthenticationRequired et le token client est propagé vers Mobility via Feign."
+      },
+      "endpoints": [
+        {
+          "path": "/api/v1/alerts",
+          "method": "GET",
+          "description": "Récupère les alertes de mobilité bancaire avec filtres optionnels.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "topics",
+              "type"
+            ],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "Alert[]",
+          "status_codes": [
+            200,
+            400,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "mobility_api",
+              "resource": "/api/mobility/me/incoming-hook",
+              "operation": "GET"
+            },
+            {
+              "component_id": "mobility_api",
+              "resource": "/api/mobility/me/pending-signature",
+              "operation": "GET"
+            },
+            {
+              "component_id": "mobility_api",
+              "resource": "/api/mobility/me/current-departure",
+              "operation": "GET"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/alerts",
+          "method": "DELETE",
+          "description": "Supprime l’alerte d’accroche de mobilité bancaire.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": [
+              "Authorization"
+            ]
+          },
+          "response_schema": "void",
+          "status_codes": [
+            204,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "mobility_api",
+              "resource": "/api/mobility/me/incoming-hook",
+              "operation": "DELETE"
+            }
+          ]
+        },
+        {
+          "path": "/check",
+          "method": "GET",
+          "description": "Healthcheck simple du service.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200
+          ],
+          "validation": "⚠️ NON VALIDÉ"
+        }
+      ],
+      "deployment": {
+        "containerized": true,
+        "platform": "Docker",
+        "ci_cd": "GitLab CI"
+      }
+    },
+    {
+      "id": "mobility_api",
+      "label": "Mobility API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign + OkHttp + Jackson)",
+      "url": "${cloud_mobilityapi_url}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/api/mobility/me/incoming-hook",
+          "method": "GET"
+        },
+        {
+          "path": "/api/mobility/me/incoming-hook",
+          "method": "DELETE"
+        },
+        {
+          "path": "/api/mobility/me/pending-signature",
+          "method": "GET"
+        },
+        {
+          "path": "/api/mobility/me/current-departure",
+          "method": "GET"
+        }
+      ],
+      "used_by": [
+        "backend_alert_api"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "backend_alert_api_to_mobility_api",
+      "from": "backend_alert_api",
+      "to": "mobility_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true
+    }
+  ]
+}

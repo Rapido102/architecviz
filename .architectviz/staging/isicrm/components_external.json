@@ -1,0 +1,32 @@
+[
+  {
+    "id": "arkea_cas",
+    "label": "Arkéa CAS SSO",
+    "type": "iam",
+    "layer": "External",
+    "technology": "CAS SSO",
+    "url": "${CAS_URL}",
+    "consumed_via": "GicmCASFilter",
+    "endpoints": [
+      {
+        "path": "/login",
+        "method": "GET",
+        "description": "Point d’entrée de l’authentification SSO CAS pour l’ouverture de session web."
+      },
+      {
+        "path": "/serviceValidate",
+        "method": "GET",
+        "description": "Validation du ticket CAS côté application web après authentification."
+      },
+      {
+        "path": "/logout",
+        "method": "GET",
+        "description": "Fermeture de session SSO côté CAS."
+      }
+    ],
+    "used_by": [
+      "edeal_parent"
+    ],
+    "description": "Fournisseur d’authentification SSO CAS utilisé par l’interface web E-DEAL/Merlin via GicmCASFilter ; l’application web est protégée par session CAS, à l’exception des endpoints /customrestapi/* explicitement exclus du filtre."
+  }
+]

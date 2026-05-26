@@ -1,0 +1,2396 @@
+[
+  {
+    "id": "edeal_parent",
+    "label": "Edeal Parent",
+    "description": "Application E-DEAL CRM Fortuneo packagée en WAR et déployée sur Tomcat. Elle expose une API REST sous /customrestapi pour gérer personnes, entreprises, demandes, opportunités, interactions, pièces justificatives et référentiels métier, tout en s’appuyant sur la base Oracle Merlin et des événements Kafka.",
+    "type": "backend",
+    "layer": "Backend",
+    "technology": "Java + Spring MVC 5.3.23 + Swagger Spring MVC 1.0.2 + WAR/Tomcat",
+    "url": "${EDEALCRM_URL}",
+    "authentication": {
+      "type": "CAS SSO (session web)",
+      "provider": "Arkéa CAS via GicmCASFilter",
+      "token_format": "Session/cookie CAS ; /customrestapi/* exclu du filtre CAS",
+      "token_expiry": "Durée de session Tomcat/CAS à confirmer",
+      "roles_permissions": "Contrôles CAS et filtres web sur l’application ; les endpoints /customrestapi/* sont explicitement exclus du filtre CAS",
+      "note": "web.xml mappe GicmCASFilter sur /* mais /customrestapi/* est aussi exclu via DoNothingFilter et cas.filter.path.exclusion dans ClientGestionContexte.properties."
+    },
+    "endpoints": [
+      {
+        "path": "/customrestapi/personne",
+        "method": "POST",
+        "description": "Crée une personne et retourne son identifiant CRM.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "PersonneDto"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerPersonneResponse",
+        "status_codes": [
+          201,
+          405,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT",
+            "note": "Recherche d’un doublon puis création/mise à jour éventuelle."
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "UPSERT",
+            "note": "Création ou fusion de la personne selon les champs d’unicité."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/fusion",
+        "method": "POST",
+        "description": "Fusionne les champs d’un client existant ou crée la personne si nécessaire.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "PersonneDto"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerPersonneResponse",
+        "status_codes": [
+          201,
+          405,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT",
+            "note": "Recherche de la personne existante par code CRM, numéro client ou dédoublonnage."
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "UPSERT",
+            "note": "Fusion des données dans la personne existante ou création du prospect."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/{idPersonne}",
+        "method": "DELETE",
+        "description": "Supprime la personne cible.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idPersonne"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "DELETE"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/criteres",
+        "method": "POST",
+        "description": "Recherche des personnes par critères de dédoublonnage.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "InfosDedoublonnageBean"
+          ],
+          "headers": []
+        },
+        "response_schema": "List<PersonneDto>",
+        "status_codes": [
+          201,
+          405,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT",
+            "note": "Recherche multi-critères de dédoublonnage."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/numClient/{idPersonne}",
+        "method": "GET",
+        "description": "Récupère une personne par numéro client.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idPersonne"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "PersonneDto",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/numClientTemp/{numClientTemp}",
+        "method": "GET",
+        "description": "Récupère une personne par identifiant client temporaire ou numéro selon le flag.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "flag"
+          ],
+          "path": [
+            "numClientTemp"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "PersonneDto",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/identifiantSite/{idSite}",
+        "method": "GET",
+        "description": "Récupère une personne à partir de son identifiant site.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idSite"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "PersonneDto",
+        "status_codes": [
+          200,
+          404,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/idCRM/{idCRM}",
+        "method": "GET",
+        "description": "Récupère une personne à partir de son code CRM.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idCRM"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "PersonneDto",
+        "status_codes": [
+          200,
+          404,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/idCRM/{idCRM}/infosMarketingEtConsentements",
+        "method": "PUT",
+        "description": "Met à jour les informations marketing et les consentements d’une personne.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idCRM"
+          ],
+          "body": [
+            "InfosMarketingEtConsentementsBean"
+          ],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200,
+          404,
+          422,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "UPDATE",
+            "note": "Mise à jour des informations marketing et consentements."
+          },
+          {
+            "component_id": "mq_kafka",
+            "resource": "3883.merlin.consents.*",
+            "operation": "PUBLISH",
+            "note": "Publication asynchrone des consentements via job métier."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/purge",
+        "method": "DELETE",
+        "description": "Purge les dossiers de personnes et d’entreprises fournis dans le body.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "DossiersAPurgerBean"
+          ],
+          "headers": []
+        },
+        "response_schema": "void",
+        "status_codes": [
+          200,
+          422,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "DELETE",
+            "note": "Purge des dossiers personne."
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Enterprise",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Enterprise",
+            "operation": "DELETE",
+            "note": "Purge des dossiers entreprise."
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "HistoriqueSuppression_",
+            "operation": "INSERT",
+            "note": "Traçabilité potentielle de la purge à confirmer."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/{idCRM}/demandes",
+        "method": "GET",
+        "description": "Recherche des demandes d’une personne selon des critères métier.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "etapes",
+            "statuts",
+            "qualifications",
+            "produits",
+            "beneficiaire",
+            "demandeurs"
+          ],
+          "path": [
+            "idCRM"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "List<DemandeDto>",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/{idCRM}/demandesClient/count",
+        "method": "GET",
+        "description": "Retourne le nombre de demandes client en cours pour une personne.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "etapes",
+            "statuts",
+            "qualifications",
+            "produits",
+            "beneficiaire",
+            "demandeurs"
+          ],
+          "path": [
+            "idCRM"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "Number",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/{idCRM}/demandesClient",
+        "method": "GET",
+        "description": "Recherche des demandes client d’une personne avec synthèse métier.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "etapes",
+            "statuts",
+            "qualifications",
+            "produits",
+            "beneficiaire",
+            "demandeurs"
+          ],
+          "path": [
+            "idCRM"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "List<DemandeDto>",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "FTOHistory_",
+            "operation": "SELECT",
+            "note": "Récupération de la date de dernier retour PM pour les demandes non CLOSED."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/{idCRM}/demandesClient",
+        "method": "POST",
+        "description": "Recherche des demandes client d’une personne à partir d’un body de critères.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idCRM"
+          ],
+          "body": [
+            "DemandesClientRequestDto"
+          ],
+          "headers": []
+        },
+        "response_schema": "List<DemandeDto>",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "FTOHistory_",
+            "operation": "SELECT",
+            "note": "Récupération de la date de dernier retour PM pour les demandes non CLOSED."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/{personNumber}/demandeClientByToken/{tokenDmd}",
+        "method": "GET",
+        "description": "Recherche une demande client en attente à partir de son token et du numéro personne.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "personNumber",
+            "tokenDmd"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "DemandeDto",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Messages",
+            "operation": "SELECT",
+            "note": "Lecture du message associé pour extraire une route Kiamo éventuelle."
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "SELECT",
+            "note": "Lecture de l’interaction liée à la demande PM."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/{idCRM}/demandesClientPmById/{tokenDmd}",
+        "method": "GET",
+        "description": "Recherche une demande client PM en attente à partir de son token.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idCRM",
+            "tokenDmd"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "DemandeDto",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/{idCRMBeneficiaire}/demandes/add",
+        "method": "GET",
+        "description": "Recherche une demande avec ADD irrégulière pour un bénéficiaire et un compte.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "numeroCompte",
+            "montantADD"
+          ],
+          "path": [
+            "idCRMBeneficiaire"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "DemandeDto",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/{idCRM}/demandes/{numDossierMobilite}",
+        "method": "GET",
+        "description": "Recherche une demande par numéro de dossier mobilité.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idCRM",
+            "numDossierMobilite"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "DemandeDto",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/{idCRM}/alertes",
+        "method": "GET",
+        "description": "Retourne les alertes rattachées à une personne et à ses demandes.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "codeAlerte"
+          ],
+          "path": [
+            "idCRM"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "AlerteResponse",
+        "status_codes": [
+          200,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "AlerteFTO_",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT",
+            "note": "Chargement des alertes de demandes liées à la personne."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/{idCRM}/alertes",
+        "method": "PUT",
+        "description": "Crée ou met à jour une alerte sur une personne.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idCRM"
+          ],
+          "body": [
+            "AlerteFTODTO"
+          ],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "AlerteFTO_",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "AlerteFTO_",
+            "operation": "UPSERT",
+            "note": "Création ou mise à jour de l’alerte."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/idCRM/{idCRM}/segmentationSP",
+        "method": "GET",
+        "description": "Récupère la segmentation SP d’une personne via son code CRM.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idCRM"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "RecupererSegmentationSPResponse",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/personne/codeAcces/{codeAcces}/segmentationSPParCodeAcces",
+        "method": "GET",
+        "description": "Récupère la segmentation SP d’une personne à partir de son code d’accès.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "codeAcces"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "RecupererSegmentationSPResponse",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Person",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/demandes",
+        "method": "POST",
+        "description": "Crée une demande.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "DemandeDto"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerDemandeResponse",
+        "status_codes": [
+          201,
+          400,
+          404,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "INSERT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/demandes/{id}",
+        "method": "GET",
+        "description": "Recherche une demande par identifiant technique.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "id"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "DemandeDto",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/demandes",
+        "method": "GET",
+        "description": "Recherche des demandes par idConversation ou référence externe.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "referenceExterne",
+            "idConversation"
+          ],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "List<DemandeDto>",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/demandes/{id}",
+        "method": "PATCH",
+        "description": "Modifie partiellement une demande.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "id"
+          ],
+          "body": [
+            "DemandeDto"
+          ],
+          "headers": []
+        },
+        "response_schema": "DemandeDto",
+        "status_codes": [
+          200,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "UPDATE"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/demandes/{idDemande}",
+        "method": "DELETE",
+        "description": "Supprime la demande cible.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idDemande"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "DELETE"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/demandes/pilotage/{idDemande}",
+        "method": "POST",
+        "description": "Pilote l’évolution d’une demande depuis le SI.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "code"
+          ],
+          "path": [
+            "idDemande"
+          ],
+          "body": [
+            "DemandeDto"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerDemandeResponse",
+        "status_codes": [
+          200,
+          404,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "UPDATE",
+            "note": "Transition d’état / pilotage."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/demandes/{idDemande}/codepromo/{codePromo}",
+        "method": "PUT",
+        "description": "Met à jour le code promotionnel d’une demande.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idDemande",
+            "codePromo"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "CreerDemandeResponse",
+        "status_codes": [
+          201,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "CodePromo_",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "UPDATE",
+            "note": "Mise à jour du code promo sur la demande."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/demandes/{dmdID}",
+        "method": "PUT",
+        "description": "Fait évoluer une demande via un code d’événement.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "code"
+          ],
+          "path": [
+            "dmdID"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "CreerDemandeResponse",
+        "status_codes": [
+          200,
+          404,
+          422,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "UPDATE",
+            "note": "Évolution de la demande via code événement."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/demandes/{idDemande}/nantissement",
+        "method": "GET",
+        "description": "Retourne les informations de nantissement de l’opportunité liée à une demande.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idDemande"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "NantissementOpportuniteDto",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Opportunity",
+            "operation": "SELECT",
+            "note": "Lecture de l’opportunité liée à la demande pour le nantissement."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/demandes/{idDemande}/pieces",
+        "method": "GET",
+        "description": "Retourne les pièces à fournir associées à une demande.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idDemande"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "List<PieceAFournirDto>",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "PieceAFournir_",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/opportunites",
+        "method": "POST",
+        "description": "Crée une opportunité ou fusionne avec une opportunité existante.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "OpportuniteDto"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerOpportuniteResponse",
+        "status_codes": [
+          201,
+          405,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Opportunity",
+            "operation": "SELECT",
+            "note": "Recherche d’une opportunité existante par personne/produit."
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Opportunity",
+            "operation": "UPSERT",
+            "note": "Création ou fusion de l’opportunité."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/opportunites/{id}",
+        "method": "GET",
+        "description": "Recherche une opportunité par identifiant technique.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "id"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "OpportuniteDto",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Opportunity",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/opportunites",
+        "method": "GET",
+        "description": "Recherche des opportunités par idConversation.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "idConversation"
+          ],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "List<OpportuniteDto>",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Opportunity",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/opportunites/{idProduct}/{codeCRM}",
+        "method": "GET",
+        "description": "Recherche des opportunités par code produit et code CRM.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idProduct",
+            "codeCRM"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "List<OpportuniteDto>",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Opportunity",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/opportunites/{id}",
+        "method": "PATCH",
+        "description": "Modifie partiellement une opportunité.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "id"
+          ],
+          "body": [
+            "OpportuniteDto"
+          ],
+          "headers": []
+        },
+        "response_schema": "OpportuniteDto",
+        "status_codes": [
+          200,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Opportunity",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Opportunity",
+            "operation": "UPDATE"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/opportunites",
+        "method": "DELETE",
+        "description": "Supprime les opportunités associées à un numéro Topaze.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "numeroPersonne"
+          ],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Opportunity",
+            "operation": "DELETE",
+            "note": "Suppression des opportunités liées à un numéro personne."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/opportunites/{idOpportunite}",
+        "method": "DELETE",
+        "description": "Supprime l’opportunité cible.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idOpportunite"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Opportunity",
+            "operation": "DELETE"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/enterprise",
+        "method": "POST",
+        "description": "Crée une entreprise ou fusionne avec l’existant selon le code CRM / numéro client.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "EnterpriseDto"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreateEnterpriseResponse",
+        "status_codes": [
+          201,
+          405,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Enterprise",
+            "operation": "SELECT",
+            "note": "Recherche de l’entreprise existante par code CRM ou numéro client."
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Enterprise",
+            "operation": "UPDATE",
+            "note": "Fusion dans l’entreprise existante ; création réelle à confirmer dans ce flux."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/enterprise/IdSite/{IdSite}",
+        "method": "GET",
+        "description": "Récupère une entreprise par identifiant site.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "IdSite"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "EnterpriseDto",
+        "status_codes": [
+          200,
+          404,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Enterprise",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/enterprise/numClient/{idPersonne}",
+        "method": "GET",
+        "description": "Récupère une entreprise par numéro client.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idPersonne"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "EnterpriseDto",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Enterprise",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/enterprise/idCRM/{idCRM}",
+        "method": "GET",
+        "description": "Récupère une entreprise par code CRM.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idCRM"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "EnterpriseDto",
+        "status_codes": [
+          200,
+          404,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Enterprise",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/enterprise/{idCRM}/alertes",
+        "method": "GET",
+        "description": "Retourne les alertes associées à une entreprise.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "codeAlerte"
+          ],
+          "path": [
+            "idCRM"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "AlerteResponse",
+        "status_codes": [
+          200,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Enterprise",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "AlerteFTO_",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/enterprise/{idCRM}/alertes",
+        "method": "PUT",
+        "description": "Crée ou met à jour une alerte sur une entreprise.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idCRM"
+          ],
+          "body": [
+            "AlerteFTODTO"
+          ],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Enterprise",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "AlerteFTO_",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "AlerteFTO_",
+            "operation": "UPSERT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/interactions/notes",
+        "method": "POST",
+        "description": "Crée une interaction de type note.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "InteractionNotesDTO"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerInteractionResponse",
+        "status_codes": [
+          201,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "INSERT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Messages",
+            "operation": "UPSERT",
+            "note": "Message / payload associé à l’interaction à confirmer selon le type."
+          },
+          {
+            "component_id": "mq_kafka",
+            "resource": "3883.merlin.interactions*",
+            "operation": "PUBLISH",
+            "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/interactions/rdv",
+        "method": "POST",
+        "description": "Crée une interaction de type rendez-vous.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "InteractionRdvDTO"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerInteractionResponse",
+        "status_codes": [
+          201,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "INSERT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Messages",
+            "operation": "UPSERT",
+            "note": "Message / payload associé à l’interaction à confirmer selon le type."
+          },
+          {
+            "component_id": "mq_kafka",
+            "resource": "3883.merlin.interactions*",
+            "operation": "PUBLISH",
+            "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/interactions/taches",
+        "method": "POST",
+        "description": "Crée une interaction de type tâche.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "InteractionTachesDTO"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerInteractionResponse",
+        "status_codes": [
+          201,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "INSERT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Messages",
+            "operation": "UPSERT",
+            "note": "Message / payload associé à l’interaction à confirmer selon le type."
+          },
+          {
+            "component_id": "mq_kafka",
+            "resource": "3883.merlin.interactions*",
+            "operation": "PUBLISH",
+            "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/interactions/courrierSortant",
+        "method": "POST",
+        "description": "Crée une interaction de type courrier sortant.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "InteractionCourrierSortantDTO"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerInteractionResponse",
+        "status_codes": [
+          201,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "INSERT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Messages",
+            "operation": "UPSERT",
+            "note": "Message / payload associé à l’interaction à confirmer selon le type."
+          },
+          {
+            "component_id": "mq_kafka",
+            "resource": "3883.merlin.interactions*",
+            "operation": "PUBLISH",
+            "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/interactions/courrierEntrant",
+        "method": "POST",
+        "description": "Crée une interaction de type courrier entrant.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "InteractionCourrierEntrantDTO"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerInteractionResponse",
+        "status_codes": [
+          201,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "INSERT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Messages",
+            "operation": "UPSERT",
+            "note": "Message / payload associé à l’interaction à confirmer selon le type."
+          },
+          {
+            "component_id": "mq_kafka",
+            "resource": "3883.merlin.interactions*",
+            "operation": "PUBLISH",
+            "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/interactions/emailSortant",
+        "method": "POST",
+        "description": "Crée une interaction de type email sortant.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "InteractionEmailSortantDTO"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerInteractionResponse",
+        "status_codes": [
+          201,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "INSERT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Messages",
+            "operation": "UPSERT",
+            "note": "Le contenu détaillé du message est porté par les tables de messagerie CRM."
+          },
+          {
+            "component_id": "mq_kafka",
+            "resource": "3883.merlin.interactions*",
+            "operation": "PUBLISH",
+            "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/interactions/emailEntrant",
+        "method": "POST",
+        "description": "Crée une interaction de type email entrant.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "InteractionEmailEntrantDTO"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerInteractionResponse",
+        "status_codes": [
+          201,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "INSERT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Messages",
+            "operation": "UPSERT",
+            "note": "Le contenu détaillé du message est porté par les tables de messagerie CRM."
+          },
+          {
+            "component_id": "mq_kafka",
+            "resource": "3883.merlin.interactions*",
+            "operation": "PUBLISH",
+            "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/interactions/sms",
+        "method": "POST",
+        "description": "Crée une interaction de type SMS.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "InteractionSmsDTO"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerInteractionResponse",
+        "status_codes": [
+          201,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "INSERT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Messages",
+            "operation": "UPSERT",
+            "note": "Message / payload associé à l’interaction à confirmer selon le type."
+          },
+          {
+            "component_id": "mq_kafka",
+            "resource": "3883.merlin.interactions*",
+            "operation": "PUBLISH",
+            "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/interactions/outpush",
+        "method": "POST",
+        "description": "Crée une interaction de type push sortant.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "InteractionPushDTO"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerInteractionResponse",
+        "status_codes": [
+          201,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "INSERT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Messages",
+            "operation": "UPSERT",
+            "note": "Message / payload associé à l’interaction à confirmer selon le type."
+          },
+          {
+            "component_id": "mq_kafka",
+            "resource": "3883.merlin.interactions*",
+            "operation": "PUBLISH",
+            "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/interactions/appelSortant",
+        "method": "POST",
+        "description": "Crée une interaction de type appel sortant.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "InteractionAppelSortantDTO"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerInteractionResponse",
+        "status_codes": [
+          201,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "INSERT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Messages",
+            "operation": "UPSERT",
+            "note": "Message / payload associé à l’interaction à confirmer selon le type."
+          },
+          {
+            "component_id": "mq_kafka",
+            "resource": "3883.merlin.interactions*",
+            "operation": "PUBLISH",
+            "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/interactions/appelEntrant",
+        "method": "POST",
+        "description": "Crée une interaction de type appel entrant.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "InteractionAppelEntrantDTO"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerInteractionResponse",
+        "status_codes": [
+          201,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "INSERT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Messages",
+            "operation": "UPSERT",
+            "note": "Message / payload associé à l’interaction à confirmer selon le type."
+          },
+          {
+            "component_id": "mq_kafka",
+            "resource": "3883.merlin.interactions*",
+            "operation": "PUBLISH",
+            "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/interactions",
+        "method": "POST",
+        "description": "Crée une interaction générique via l’ancien DTO.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "InteractionOldDto"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerInteractionResponse",
+        "status_codes": [
+          201,
+          405,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "INSERT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Messages",
+            "operation": "UPSERT",
+            "note": "Message / payload associé à l’interaction à confirmer selon le type."
+          },
+          {
+            "component_id": "mq_kafka",
+            "resource": "3883.merlin.interactions*",
+            "operation": "PUBLISH",
+            "note": "Synchronisation asynchrone d’interactions via jobs Kafka."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/interactions/{idInteraction}",
+        "method": "DELETE",
+        "description": "Supprime l’interaction cible.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idInteraction"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "DELETE"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/interactions/{idInteraction}/message",
+        "method": "GET",
+        "description": "Retourne le message détaillé d’une interaction email sortante.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idInteraction"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "InteractionPmDto",
+        "status_codes": [
+          200,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Messages",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/interactions/{idInteraction}/status/DONE",
+        "method": "PUT",
+        "description": "Valide une interaction et la passe au statut DONE.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idInteraction"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Interaction",
+            "operation": "UPDATE"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/codepromotion/codepromo",
+        "method": "POST",
+        "description": "Crée un code promotionnel.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "CodePromotionDto"
+          ],
+          "headers": []
+        },
+        "response_schema": "CreerCodePromotionResponse",
+        "status_codes": [
+          201,
+          400,
+          404,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "CodePromo_",
+            "operation": "INSERT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/codepromotion/{codePromo}",
+        "method": "GET",
+        "description": "Vérifie l’existence d’un code promotionnel.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "codePromo"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "ExistanceCodePromotionResponse",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "CodePromo_",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/codepromotion/{codePromo}/{dateValidite}",
+        "method": "GET",
+        "description": "Vérifie l’existence d’un code promotionnel à une date donnée.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "codePromo",
+            "dateValidite"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "ExistanceCodePromotionResponse",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "CodePromo_",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/codepromotion/produit/{codeProduit}",
+        "method": "GET",
+        "description": "Récupère le texte contractuel associé à un produit.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "codeProduit"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "ExistanceCodePromotionResponse",
+        "status_codes": [
+          200,
+          404,
+          422,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "CodePromo_",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/codepromotion/codepromo",
+        "method": "PATCH",
+        "description": "Met à jour la date de fin de validité d’un code promotionnel.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "CodePromotionDto"
+          ],
+          "headers": []
+        },
+        "response_schema": "CodePromotionDto",
+        "status_codes": [
+          200,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "CodePromo_",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "CodePromo_",
+            "operation": "UPDATE"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/codepubs",
+        "method": "GET",
+        "description": "Recherche des codes publicitaires par code, catégorie et sous-catégorie.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "code",
+            "categorie",
+            "sousCategorie"
+          ],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "List<CodePubDTO>",
+        "status_codes": [
+          200,
+          400,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "CodePub_",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/piece",
+        "method": "POST",
+        "description": "Crée ou fusionne des pièces à fournir pour une demande.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "ListePiecesManquantesBean"
+          ],
+          "headers": []
+        },
+        "response_schema": "void",
+        "status_codes": [
+          201,
+          400,
+          404,
+          405,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "PieceAFournir_",
+            "operation": "SELECT",
+            "note": "Recherche d’une pièce existante par demande/type avant fusion éventuelle."
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "PieceAFournir_",
+            "operation": "UPSERT",
+            "note": "Création ou fusion des pièces à fournir."
+          },
+          {
+            "component_id": "db_oracle",
+            "resource": "Demande",
+            "operation": "SELECT",
+            "note": "Référence fonctionnelle à la demande liée à la pièce."
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/piece/{idPieceAFournir}",
+        "method": "DELETE",
+        "description": "Supprime une pièce à fournir.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "idPieceAFournir"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "PieceAFournir_",
+            "operation": "DELETE"
+          }
+        ]
+      },
+      {
+        "path": "/customrestapi/referentiel/nameReferenciel/{nameReferentiel}",
+        "method": "GET",
+        "description": "Retourne les valeurs d’un référentiel métier.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "nameReferentiel"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "List<RefValDTO>",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "Référentiel métier",
+            "operation": "SELECT",
+            "note": "Nom de référentiel dynamique transmis dans l’URL ; table physique à confirmer."
+          }
+        ]
+      }
+    ],
+    "deployment": {
+      "containerized": true,
+      "platform": "Docker",
+      "ci_cd": "GitLab CI"
+    }
+  }
+]

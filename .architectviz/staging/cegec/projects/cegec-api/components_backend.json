@@ -1,0 +1,194 @@
+[
+  {
+    "id": "backend_spring",
+    "label": "Backend Spring",
+    "description": "API CEGEC de gestion des gestes commerciaux, exposée en Jersey/JAX-RS. Elle agrège des référentiels de paramétrage, consulte les produits client et restitue l’habilitation et le contexte utilisateur.",
+    "type": "backend",
+    "layer": "Backend",
+    "technology": "Java 25 + Spring Boot 4.0.3 + Jersey (JAX-RS) + OpenFeign + Spring Data JDBC",
+    "url": "À confirmer",
+    "port": 8080,
+    "authentication": {
+      "type": "JWT via header Authentication",
+      "provider": "WS Habilitation",
+      "token_format": "Authentication: <JWT brut>",
+      "token_expiry": "Porté par le JWT amont ; non contrôlé par l’application",
+      "roles_permissions": "RBAC basé sur le niveau d’accès CEGEC et les structures autorisées renvoyés par WS Habilitation",
+      "note": "Le schéma OpenAPI déclare une sécurité par header Authentication. Les annotations CasHabilitations sont encore commentées dans les contrôleurs, mais l’application s’appuie sur UserContext et WS Habilitation pour contrôler l’accès."
+    },
+    "endpoints": [
+      {
+        "path": "/api/v1/app-params",
+        "method": "GET",
+        "description": "Récupère le contexte utilisateur enrichi et les paramètres applicatifs nécessaires à l’interface.",
+        "authenticated": true,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [],
+          "headers": [
+            "Authentication"
+          ]
+        },
+        "response_schema": "AppParams",
+        "status_codes": [
+          200,
+          401,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "cache_redis",
+            "resource": "USER-CONTEXT-*",
+            "operation": "GET",
+            "note": "Lecture du cache users via @Cacheable sur AuthBusinessImpl.getUserContext()."
+          },
+          {
+            "component_id": "cache_redis",
+            "resource": "USER-CONTEXT-*",
+            "operation": "SET",
+            "note": "Alimentation cache-aside du contexte utilisateur lors d’un miss. TTL 10h."
+          },
+          {
+            "component_id": "wshabilitation_client_api",
+            "resource": "/users/{casId}/access_rights/CEGEC",
+            "operation": "GET"
+          },
+          {
+            "component_id": "wsannuaire_client_api",
+            "resource": "/me/person",
+            "operation": "GET"
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/form-params",
+        "method": "GET",
+        "description": "Retourne les paramètres du formulaire de création de fiche, à partir des référentiels de catégories et d’opérations.",
+        "authenticated": true,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [],
+          "headers": [
+            "Authentication"
+          ]
+        },
+        "response_schema": "FormParams",
+        "status_codes": [
+          200,
+          401,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_mysql",
+            "resource": "t38gcod",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_mysql",
+            "resource": "t38categorie_geste",
+            "operation": "SELECT"
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/client-products/{numeroPersonne}",
+        "method": "GET",
+        "description": "Récupère les comptes et cartes d’un client à partir de son numéro de personne, avec gestion des erreurs partielles des APIs externes.",
+        "authenticated": true,
+        "params": {
+          "query": [],
+          "path": [
+            "numeroPersonne"
+          ],
+          "body": [],
+          "headers": [
+            "Authentication"
+          ]
+        },
+        "response_schema": "CustomerInformationResponseDto",
+        "status_codes": [
+          200,
+          400,
+          401,
+          404,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "account_client_api",
+            "resource": "/accounts",
+            "operation": "GET",
+            "note": "Appel avec header X-Arkea-Numeropersonne = numeroPersonne."
+          },
+          {
+            "component_id": "card_client_api",
+            "resource": "/cards",
+            "operation": "GET",
+            "note": "Appel avec header X-Arkea-Numeropersonne = numeroPersonne."
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/gestures",
+        "method": "GET",
+        "description": "Retourne la liste paginée des gestes commerciaux d’un client, avec filtres optionnels sur le numéro client et la date de création, ainsi que des indicateurs de période.",
+        "authenticated": true,
+        "params": {
+          "query": [
+            "numeroClient",
+            "creationDate",
+            "page"
+          ],
+          "path": [],
+          "body": [],
+          "headers": [
+            "Authentication"
+          ]
+        },
+        "response_schema": "GesturesResponse",
+        "status_codes": [
+          200,
+          400
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_mysql",
+            "resource": "t38fiches",
+            "operation": "SELECT",
+            "note": "Lecture de la liste des gestes, du compteur global et des indicateurs 12 mois via NamedParameterJdbcTemplate."
+          }
+        ]
+      },
+      {
+        "path": "/check",
+        "method": "GET",
+        "description": "Healthcheck simple de l’application.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": []
+      }
+    ],
+    "deployment": {
+      "containerized": true,
+      "platform": "Docker",
+      "ci_cd": "GitLab CI"
+    }
+  }
+]

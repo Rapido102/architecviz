@@ -1,0 +1,34 @@
+[
+  {
+    "id": "iam_oidc",
+    "label": "OIDC Provider",
+    "description": "Fournisseur d'identité OIDC de la plateforme, référencé par la configuration OAuth2/Spring Security du service notify-webhook.",
+    "type": "iam",
+    "layer": "External",
+    "technology": "OIDC",
+    "url": "${OIDC_ISSUER_URI}",
+    "used_by": [
+      "backend_notify_webhook"
+    ]
+  },
+  {
+    "id": "oauth_api",
+    "label": "Oauth API",
+    "description": "Service OAuth externe utilisé par notify-webhook pour vérifier la validité d'un bearer token via l'endpoint /oauth2/token/check.",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign)",
+    "url": "${application.configurations.client.rest.oauth.url}",
+    "consumed_via": "OpenFeign",
+    "endpoints": [
+      {
+        "path": "/oauth2/token/check",
+        "method": "POST",
+        "description": "Vérifie la validité d'un bearer token transmis par le webhook."
+      }
+    ],
+    "used_by": [
+      "backend_notify_webhook"
+    ]
+  }
+]

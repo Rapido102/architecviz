@@ -1,0 +1,73 @@
+[
+  {
+    "id": "iam_oidc",
+    "label": "OIDC Provider",
+    "type": "iam",
+    "layer": "External",
+    "technology": "OIDC",
+    "url": "${OIDC_ISSUER_URI}",
+    "used_by": [
+      "backend_notify_events_dispatcher"
+    ]
+  },
+  {
+    "id": "clientapi_client_api",
+    "label": "Clientapi-client API",
+    "description": "API client interne utilisée pour récupérer les moyens de contact d'un client avant l'envoi d'une notification.",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign)",
+    "url": "${application.configurations.client.rest.clientapi.url}",
+    "consumed_via": "OpenFeign",
+    "endpoints": [
+      {
+        "path": "/private/persons/{ciphered_no_pse}/contacts",
+        "method": "GET",
+        "description": "Retourne les coordonnées de contact d'une personne à partir de son numéro chiffré."
+      }
+    ],
+    "used_by": [
+      "backend_notify_events_dispatcher"
+    ]
+  },
+  {
+    "id": "cognito_client_api",
+    "label": "Cognito-client API",
+    "description": "Service Cognito/OAuth appelé en client_credentials pour obtenir les jetons techniques utilisés lors des appels sortants vers Notify.",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign)",
+    "url": "${application.configurations.client.rest.cognito.url}",
+    "consumed_via": "OpenFeign",
+    "endpoints": [
+      {
+        "path": "/",
+        "method": "POST",
+        "description": "Délivre un access token technique Cognito en grant client_credentials."
+      }
+    ],
+    "used_by": [
+      "backend_notify_events_dispatcher"
+    ]
+  },
+  {
+    "id": "notify_client_api",
+    "label": "Notify-client API",
+    "description": "API Notify utilisée pour créer les notifications clients à partir des événements métier dispatchés.",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign)",
+    "url": "${application.configurations.client.rest.notify.url}",
+    "consumed_via": "OpenFeign",
+    "endpoints": [
+      {
+        "path": "/v2/notifications",
+        "method": "POST",
+        "description": "Crée et envoie une notification vers un destinataire donné."
+      }
+    ],
+    "used_by": [
+      "backend_notify_events_dispatcher"
+    ]
+  }
+]

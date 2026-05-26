@@ -1,0 +1,41 @@
+[
+  {
+    "id": "bo_cegec",
+    "label": "Bo Cegec",
+    "description": "Back-office CEGEC permettant la recherche client et le parcours de création d’un geste commercial.",
+    "type": "frontend",
+    "layer": "Frontend",
+    "technology": "React 19.2.4 + Vite 7.2.7",
+    "url": "À confirmer",
+    "build_tool": "Vite 7.2.7",
+    "state_management": "@tanstack/react-query 5.90.12 (server-state) + zustand 4.5.7 (client-state)",
+    "key_dependencies": [
+      "axios 1.15.0",
+      "@fortuneo/fto-bo-security-lib 1.0.17",
+      "@fortuneo/ui 3.7.0"
+    ],
+    "routes": [
+      {
+        "path": "/gestion-commerciale",
+        "label": "Accueil",
+        "authenticated": true,
+        "description": "Page d’accueil du module BO CEGEC avec accès à la création d’un geste commercial.",
+        "api_calls": []
+      },
+      {
+        "path": "/gestion-commerciale/creation",
+        "label": "Création geste commercial",
+        "authenticated": true,
+        "description": "Parcours de création d’un geste commercial avec recherche client, chargement des paramètres de formulaire et consultation de l’historique des gestes.",
+        "api_calls": [
+          "GET /api/v1/client-products/{numeroPersonne}",
+          "GET /api/v1/form-params",
+          "GET /api/v1/gestes"
+        ]
+      }
+    ],
+    "deployment": {
+      "ci_cd": "GitLab CI"
+    }
+  }
+]

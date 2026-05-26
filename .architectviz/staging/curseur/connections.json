@@ -1,0 +1,16 @@
+[
+  {
+    "id": "backend_flow_distribution_api_to_service_isi_crm",
+    "from": "backend_flow_distribution_api",
+    "to": "service_isi_crm",
+    "protocol": "REST/HTTPS",
+    "authenticated": true
+  },
+  {
+    "id": "backend_flow_distribution_api_to_service_web_store",
+    "from": "backend_flow_distribution_api",
+    "to": "service_web_store",
+    "protocol": "REST/HTTPS",
+    "authenticated": true
+  }
+]

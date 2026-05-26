@@ -1,0 +1,961 @@
+[
+  {
+    "id": "isicrm_backend",
+    "label": "ISiCRM Backend",
+    "type": "backend",
+    "layer": "Backend",
+    "technology": "Java 17 + Spring MVC 5.3.5 + OpenFeign 13.2.1 + Apache Thrift + WAR/Tomcat 9",
+    "url": "${ISICRM_URL}",
+    "port": 8080,
+    "authentication": {
+      "type": "Sécurité portée majoritairement par l’infrastructure d’exposition (API interne / Tomcat), sans Spring Security détecté dans le code scanné",
+      "provider": "Contrôles d’accès applicatifs externes à confirmer côté plateforme d’hébergement ; 401/403 documentés dans les Swagger ISI-CRM",
+      "token_format": "Aucun token entrant standardisé détecté dans le code serveur scanné ; usage de query params métier (codeAcces) et ponctuellement du header x-arkea-numeropersonne",
+      "token_expiry": "Gérée hors application par l’infrastructure/gateway ; non portée par le code scanné",
+      "roles_permissions": "Le code ne montre pas de règles RBAC Spring Security ; l’existence de réponses 401/403 dans les Swagger suggère des contrôles en amont ou dans des couches non présentes dans ce dépôt",
+      "note": "Analyse fondée sur le staging et les Swagger/clients générés disponibles : aucune configuration SecurityFilterChain/WebSecurityConfigurerAdapter n’a été détectée, ce qui indique une sécurité probablement externalisée plutôt qu’implémentée directement dans ce code."
+    },
+    "note": "Backend legacy packagé en WAR et déployé sur Tomcat. Expose une API REST via /api/*, des servlets legacy (/personne/*, /evenement/*, /codepromo/*, /demande/*, /parametrage/*, /opportunite/*, /asyncValue), ainsi que des flux JMS et Kafka.",
+    "endpoints": [
+      {
+        "path": "/api/personnes",
+        "method": "GET",
+        "description": "Recherche une personne par numeroPersonne et typePersonne.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "numeroPersonne",
+            "typePersonne"
+          ],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "ResponseEntity<Personne>",
+        "status_codes": [
+          200,
+          404,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "crm_api",
+            "resource": "/edealCRM/customrestapi/personne/numClientTemp/{numClientTemp}?flag={flag}",
+            "operation": "GET"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/{numeroPersonne}",
+        "method": "GET",
+        "description": "Récupère une personne par identifiant.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "numeroPersonne"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "Personne",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "panier_thrift",
+            "resource": "/personne",
+            "operation": "POST"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/rechercher",
+        "method": "GET",
+        "description": "Recherche des personnes par critères de dédoublonnage.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "nom",
+            "prenom",
+            "codePostal",
+            "email",
+            "dateNaissance"
+          ],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "List<PersonneEtendueSI>",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "crm_api",
+            "resource": "/edealCRM/customrestapi/personne/criteres",
+            "operation": "POST"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/{numeroPersonne}/motdepasse/reedition",
+        "method": "PUT",
+        "description": "Réédite le mot de passe d'une personne.",
+        "authenticated": true,
+        "params": {
+          "query": [
+            "codeAcces",
+            "typeMedia",
+            "tarife",
+            "userConseiller"
+          ],
+          "path": [
+            "numeroPersonne"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "ResponseEntity<Boolean>",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "backend_thrift",
+            "resource": "/securiteforte",
+            "operation": "POST"
+          },
+          {
+            "component_id": "backend_thrift",
+            "resource": "/tarification",
+            "operation": "POST",
+            "note": "Appel conditionnel si tarife=true"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/{numeroPersonne}/suiviDemande",
+        "method": "GET",
+        "description": "Retourne le suivi des demandes d'une personne.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "statuts"
+          ],
+          "path": [
+            "numeroPersonne"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "List<SuiviDemande>",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "crm_api",
+            "resource": "/edealCRM/customrestapi/personne/numClient/{idPersonne}",
+            "operation": "GET"
+          },
+          {
+            "component_id": "crm_api",
+            "resource": "/edealCRM/customrestapi/personne/{idCRM}/demandesClient",
+            "operation": "POST"
+          },
+          {
+            "component_id": "redis_cache",
+            "resource": "PARAMETRAGE_SDCQ",
+            "operation": "GET"
+          },
+          {
+            "component_id": "redis_cache",
+            "resource": "PARAMETRAGE_SDCT",
+            "operation": "GET"
+          },
+          {
+            "component_id": "gesparam_api",
+            "resource": "/gesparamservices/api/v1/tables/T38SDCQ?CD_EFS=21",
+            "operation": "GET",
+            "note": "Appel sur cache miss"
+          },
+          {
+            "component_id": "gesparam_api",
+            "resource": "/gesparamservices/api/v1/tables/T38SDCT?CD_EFS=21",
+            "operation": "GET",
+            "note": "Appel sur cache miss"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/{personNumber}/suiviDemande/{dmdToken}",
+        "method": "GET",
+        "description": "Retourne une demande client à partir d'un token.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "personNumber",
+            "dmdToken"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "Demande",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "crm_api",
+            "resource": "/edealCRM/customrestapi/personne/{personNumber}/demandeClientByToken/{tokenDmd}",
+            "operation": "GET"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/{numeroPersonne}/comptes/synthese",
+        "method": "GET",
+        "description": "Retourne la synthèse des comptes d'une personne.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "codeAcces"
+          ],
+          "path": [
+            "numeroPersonne"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "SyntheseContrats",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "backend_thrift",
+            "resource": "/synthese",
+            "operation": "POST"
+          },
+          {
+            "component_id": "backend_thrift",
+            "resource": "/operation",
+            "operation": "POST",
+            "note": "Récupération des débits différés cartes"
+          },
+          {
+            "component_id": "panier_thrift",
+            "resource": "/personne",
+            "operation": "POST",
+            "note": "Vérifications complémentaires sur le titulaire"
+          },
+          {
+            "component_id": "panier_thrift",
+            "resource": "/compte",
+            "operation": "POST",
+            "note": "Récupération de comptes génériques et comptes coupon"
+          },
+          {
+            "component_id": "pacman_thrift",
+            "resource": "/contrat",
+            "operation": "POST",
+            "note": "Comptes coupon, cas conditionnel"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/{numeroPersonne}/comptes/{numeroCompte}/details",
+        "method": "GET",
+        "description": "Retourne le détail d'un compte d'une personne.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "codeAcces",
+            "typeCompte",
+            "numeroContratSouscrit"
+          ],
+          "path": [
+            "numeroPersonne",
+            "numeroCompte"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "DetailsCompteEtendu",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "backend_thrift",
+            "resource": "/synthese",
+            "operation": "POST",
+            "note": "Comptes CCO/ESP/LIV/PEA/PPE/ORD selon typeCompte"
+          },
+          {
+            "component_id": "pacman_thrift",
+            "resource": "/operation",
+            "operation": "POST",
+            "note": "Soldes et encours selon typeCompte"
+          },
+          {
+            "component_id": "pacman_thrift",
+            "resource": "/compte",
+            "operation": "POST",
+            "note": "Solde à date / autorisation découvert selon typeCompte"
+          },
+          {
+            "component_id": "backend_thrift",
+            "resource": "/operation",
+            "operation": "POST",
+            "note": "Encours débit différé selon typeCompte"
+          },
+          {
+            "component_id": "custkn_thrift",
+            "resource": "/thrift/infosclient/",
+            "operation": "POST",
+            "note": "Critères de plafonds carte, selon type de compte"
+          },
+          {
+            "component_id": "security_proxy_api",
+            "resource": "/oauth",
+            "operation": "POST",
+            "note": "Cas PER uniquement"
+          },
+          {
+            "component_id": "investorprofile_api",
+            "resource": "/investor-profiles",
+            "operation": "GET",
+            "note": "Cas PER uniquement"
+          },
+          {
+            "component_id": "lifeinsurance_api",
+            "resource": "/accounts/{accountId}",
+            "operation": "GET",
+            "note": "Cas PER uniquement"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/{numeroPersonne}/risques/synthese",
+        "method": "GET",
+        "description": "Retourne la synthèse des risques d'une personne.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "numeroPersonne"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "SyntheseRisquesClient",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "panier_thrift",
+            "resource": "/personne",
+            "operation": "POST"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/{numeroPersonne}/certifications",
+        "method": "GET",
+        "description": "Retourne la date de dernière certification KYC.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "numeroPersonne"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "ResponseEntity<CertificationKYC>",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "client_api",
+            "resource": "/private/persons/{numeroPersonnecrypte}/certifications",
+            "operation": "GET"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/segmentation/code-acces/{codeAcces}",
+        "method": "GET",
+        "description": "Retourne la segmentation SP à partir d'un code d'accès.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "codeAcces"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "ResponseEntity<RecupererSegmentationSPResponse>",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "crm_api",
+            "resource": "/edealCRM/customrestapi/personne/codeAcces/{codeAcces}/segmentationSPParCodeAcces",
+            "operation": "GET"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/{numeroPersonne}/cashback/code-acces/{codeAcces}",
+        "method": "GET",
+        "description": "Retourne les informations cashback pour une personne et un code d'accès.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "numeroPersonne",
+            "codeAcces"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "ResponseEntity<InfoCashback>",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "security_proxy_api",
+            "resource": "/oauth",
+            "operation": "POST"
+          },
+          {
+            "component_id": "cashback_api",
+            "resource": "/users/{personNumber}/context",
+            "operation": "GET"
+          }
+        ]
+      },
+      {
+        "path": "/api/comptes/{numeroCompte}/operations",
+        "method": "GET",
+        "description": "Retourne l'historique des opérations d'un compte.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "codeAcces",
+            "dateDebut",
+            "dateFin"
+          ],
+          "path": [
+            "numeroCompte"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "List<Operation>",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "pacman_thrift",
+            "resource": "/operation",
+            "operation": "POST"
+          }
+        ]
+      },
+      {
+        "path": "/api/comptes/{numeroCompte}/soldes",
+        "method": "GET",
+        "description": "Retourne les soldes d'un compte.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "codeAcces"
+          ],
+          "path": [
+            "numeroCompte"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "SoldesCompte",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "pacman_thrift",
+            "resource": "/operation",
+            "operation": "POST"
+          }
+        ]
+      },
+      {
+        "path": "/api/comptes/{numeroCompte}/operations/titres",
+        "method": "GET",
+        "description": "Retourne les opérations titres d'un compte.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "numeroPersonne",
+            "codeAcces",
+            "typeCompte",
+            "nombreOperation",
+            "dateDebut",
+            "dateFin"
+          ],
+          "path": [
+            "numeroCompte"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "List<Operation>",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "backend_thrift",
+            "resource": "/operation",
+            "operation": "POST",
+            "note": "Historique titres PEA/PPE/ORD"
+          },
+          {
+            "component_id": "backend_thrift",
+            "resource": "/assurancevie",
+            "operation": "POST",
+            "note": "Historique assurance-vie, cas VIE uniquement"
+          }
+        ]
+      },
+      {
+        "path": "/api/contrats/{numeroContratSouscrit}/credit",
+        "method": "GET",
+        "description": "Retourne les détails d'un crédit immobilier.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "numeroContratSouscrit"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "CreditImmobilier",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "pacman_thrift",
+            "resource": "/gestioncreditimmo",
+            "operation": "POST"
+          }
+        ]
+      },
+      {
+        "path": "/api/risques/{numeroPersonne}/irreguliers",
+        "method": "GET",
+        "description": "Retourne la liste des irréguliers d'une personne.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "codesStatuts",
+            "numerosComptes"
+          ],
+          "path": [
+            "numeroPersonne"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "List<Irregulier>",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "backend_thrift",
+            "resource": "/syntheserisquesclient",
+            "operation": "POST"
+          },
+          {
+            "component_id": "panier_thrift",
+            "resource": "/compte",
+            "operation": "POST",
+            "note": "Remappage numéroContratSouscrit -> numéroCompte"
+          }
+        ]
+      },
+      {
+        "path": "/api/codepromo/{codepromo}",
+        "method": "GET",
+        "description": "Vérifie l'existence d'un code promo.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [
+            "codepromo"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "ResponseEntity<Boolean>",
+        "status_codes": [
+          200,
+          404
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "crm_api",
+            "resource": "/edealCRM/customrestapi/codepromotion/{codepromo}",
+            "operation": "GET"
+          }
+        ]
+      },
+      {
+        "path": "/api/codepromo",
+        "method": "POST",
+        "description": "Crée un code promo.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "CodePromoDto"
+          ],
+          "headers": []
+        },
+        "response_schema": "StringResponse",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "crm_api",
+            "resource": "/edealCRM/customrestapi/codepromotion/codepromo",
+            "operation": "POST"
+          }
+        ]
+      },
+      {
+        "path": "/api/codepromo",
+        "method": "PUT",
+        "description": "Met à jour la date de fin de validité d'un code promo.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "CodePromoDto"
+          ],
+          "headers": []
+        },
+        "response_schema": "ResponseEntity<CodePromo>",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "crm_api",
+            "resource": "/edealCRM/customrestapi/codepromotion/codepromo",
+            "operation": "PATCH"
+          }
+        ]
+      },
+      {
+        "path": "/api/editique/pdf/souscription",
+        "method": "GET",
+        "description": "Génère le PDF de souscription.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "idOpportunite"
+          ],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "StringResponse",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "crm_api",
+            "resource": "/edealCRM/customrestapi/opportunites/{idOpportunite}",
+            "operation": "GET"
+          },
+          {
+            "component_id": "crm_api",
+            "resource": "/edealCRM/customrestapi/personne/idCRM/{idCRM}",
+            "operation": "GET",
+            "note": "Appelé pour le titulaire et éventuellement le cotitulaire"
+          },
+          {
+            "component_id": "backend_thrift",
+            "resource": "/pdf",
+            "operation": "POST"
+          }
+        ]
+      },
+      {
+        "path": "/api/editique/impressionAuto",
+        "method": "POST",
+        "description": "Crée une demande d'impression automatique.",
+        "authenticated": true,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "DemandeImpressionAutomatique"
+          ],
+          "headers": []
+        },
+        "response_schema": "ResponseEntity<String|ErrorResource>",
+        "status_codes": [
+          200,
+          409,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "dms_api",
+            "resource": "/api/v1/impression",
+            "operation": "POST"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/devices",
+        "method": "GET",
+        "description": "Liste les devices enrôlés d'une personne.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "numeroPersonne",
+            "codeAcces"
+          ],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "List<Device>",
+        "status_codes": [
+          200,
+          400,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "security_proxy_api",
+            "resource": "/oauth",
+            "operation": "POST"
+          },
+          {
+            "component_id": "security_api",
+            "resource": "/security-api/enrollment/devices",
+            "operation": "POST"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/devices/operations",
+        "method": "POST",
+        "description": "Crée une opération d'authentification forte.",
+        "authenticated": true,
+        "params": {
+          "query": [
+            "numeroPersonne",
+            "codeAcces"
+          ],
+          "path": [],
+          "body": [
+            "AuthentificationForteArgs"
+          ],
+          "headers": []
+        },
+        "response_schema": "StringResponse",
+        "status_codes": [
+          200,
+          400,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "security_proxy_api",
+            "resource": "/oauth",
+            "operation": "POST"
+          },
+          {
+            "component_id": "security_api",
+            "resource": "/security-api/operation",
+            "operation": "POST"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/devices/operations/{id}/status",
+        "method": "GET",
+        "description": "Retourne le statut d'une opération d'authentification forte.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "numeroPersonne",
+            "codeAcces"
+          ],
+          "path": [
+            "id"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "StringResponse",
+        "status_codes": [
+          200,
+          400,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "security_proxy_api",
+            "resource": "/oauth",
+            "operation": "POST"
+          },
+          {
+            "component_id": "security_api",
+            "resource": "/security-api/pending-operations/{idOperation}/status",
+            "operation": "GET"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/devices/authentification",
+        "method": "POST",
+        "description": "Crée une demande d'authentification forte côté workflow.",
+        "authenticated": true,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "AuthentificationForteArgs"
+          ],
+          "headers": [
+            "x-arkea-numeropersonne"
+          ]
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "crm_api",
+            "resource": "/edealCRM/customrestapi/personne/numClient/{idPersonne}",
+            "operation": "GET"
+          },
+          {
+            "component_id": "crm_api",
+            "resource": "/edealCRM/customrestapi/demandes",
+            "operation": "POST"
+          }
+        ]
+      },
+      {
+        "path": "/api/personnes/devices/authentification/summary",
+        "method": "POST",
+        "description": "Retourne le résumé d'une demande d'authentification forte.",
+        "authenticated": true,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "AuthentificationForteArgs"
+          ],
+          "headers": []
+        },
+        "response_schema": "Summary",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "security_api",
+            "resource": "/security-api/operation",
+            "operation": "POST",
+            "note": "Résumé/preview de la demande d’authentification forte, rapproché du même domaine fonctionnel que la création d’opération ; mapping déduit du Swagger personnesdevices et des endpoints voisins."
+          }
+        ]
+      }
+    ],
+    "deployment": {
+      "containerized": true,
+      "platform": "Docker + Tomcat 9",
+      "artifact": "WAR",
+      "ci_cd": "GitLab CI + Gradle + Makefile",
+      "orchestration": "À confirmer",
+      "note": "Dockerfile basé sur une image Tomcat Java 17. L'artefact généré est isicrm.war."
+    },
+    "description": "Backend ISI-CRM exposant des APIs métiers sur les personnes, comptes, contrats, risques, code promo, éditique et authentification forte. Il joue un rôle de façade/orchestrateur entre CRM Merlin, services Fortuneo en Thrift, APIs de sécurité et caches techniques."
+  }
+]

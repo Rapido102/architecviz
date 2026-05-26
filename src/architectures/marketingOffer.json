@@ -1,0 +1,1150 @@
+{
+  "architecture": "Marketing Offer API",
+  "type": "FULLSTACK",
+  "version": "0.1.0",
+  "lastUpdated": "2026-05-19",
+  "description": "API de gestion des offres marketing Fortuneo. Elle permet de consulter, administrer et synchroniser les offres promotionnelles avec le CRM.",
+  "layers": [
+    {
+      "name": "Frontend",
+      "color": "#E3F2FD",
+      "description": "Couche présentation — interfaces utilisateur, SPA, MFE"
+    },
+    {
+      "name": "Backend",
+      "color": "#FFF3E0",
+      "description": "Couche métier — API REST, services, traitements"
+    },
+    {
+      "name": "Data",
+      "color": "#F3E5F5",
+      "description": "Couche persistance — bases de données, cache, files"
+    },
+    {
+      "name": "External",
+      "color": "#E8F5E9",
+      "description": "Services externes / tiers — APIs partenaires, IAM, monitoring"
+    }
+  ],
+  "components": [
+    {
+      "id": "backend_marketing_offer_api",
+      "label": "Marketing Offer API",
+      "type": "backend",
+      "layer": "Backend",
+      "technology": "Java 25 + Spring Boot 4.0.1 + Jersey (JAX-RS) + OpenFeign",
+      "url": "À confirmer",
+      "port": 8080,
+      "authentication": {
+        "type": "CAS",
+        "provider": "CAS / habilitations Fortuneo",
+        "token_format": "À confirmer",
+        "token_expiry": "À confirmer",
+        "roles_permissions": "Habilitations PARPRIME_100 et PARPRIME_300",
+        "note": "Contrôle d'accès appliqué via les annotations @CasHabilitations."
+      },
+      "endpoints": [
+        {
+          "path": "/api/v1/app-params",
+          "method": "GET",
+          "description": "Récupérer les paramètres de l'API, les produits et les sous-produits disponibles.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "AppParams",
+          "status_codes": [
+            200,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_produit",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_sous_produit",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/offre/{offreType}",
+          "method": "GET",
+          "description": "Récupérer une liste d'offres avec filtres par produit, dates, état, catégorie, texte et utilisateur.",
+          "authenticated": true,
+          "params": {
+            "query": [
+              "cdPrd",
+              "dateDebut",
+              "dateDebutFin",
+              "dateFin",
+              "dateFinFin",
+              "categorieOffre",
+              "query",
+              "user",
+              "etat"
+            ],
+            "path": [
+              "offreType"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "OffreSummary[]",
+          "status_codes": [
+            200,
+            400,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_offre",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_parametrage_offre",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_palier",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_encours",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_taux_uc",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_versement_initial",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_paiements",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_versements",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_palier",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/offre/{offreType}/active",
+          "method": "GET",
+          "description": "Récupérer les offres actives pour un type d'offre et des critères de produit ou de date.",
+          "authenticated": false,
+          "params": {
+            "query": [
+              "codeOffre",
+              "codeProduit",
+              "codeSousProduit",
+              "date"
+            ],
+            "path": [
+              "offreType"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "OffreDetails[]",
+          "status_codes": [
+            200,
+            400,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_offre",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_parametrage_offre",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_palier",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_encours",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_taux_uc",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_versement_initial",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_paiements",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_versements",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_palier",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/offre/{offreType}/{idOffre}",
+          "method": "GET",
+          "description": "Récupérer le détail d'une offre par identifiant.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "offreType",
+              "idOffre"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "OffreDto",
+          "status_codes": [
+            200,
+            400,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_offre",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_parametrage_offre",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_palier",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_encours",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_taux_uc",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_versement_initial",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_paiements",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_versements",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_palier",
+              "operation": "SELECT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/offre/{offreType}",
+          "method": "POST",
+          "description": "Créer une nouvelle offre marketing.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "offreType"
+            ],
+            "body": [
+              "offre"
+            ],
+            "headers": []
+          },
+          "response_schema": "OffreDto",
+          "status_codes": [
+            201,
+            400,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_offre",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_parametrage_offre",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_encours",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_palier",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_taux_uc",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_versement_initial",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_paiements",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_versements",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_palier",
+              "operation": "INSERT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/offre/{offreType}/{id}",
+          "method": "DELETE",
+          "description": "Supprimer une offre non encore démarrée.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "offreType",
+              "id"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "Aucun contenu",
+          "status_codes": [
+            204,
+            404,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_offre",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_parametrage_offre",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_encours",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_palier",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_taux_uc",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_versement_initial",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_paiements",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_versements",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_palier",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_parametrage_offre",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_offre",
+              "operation": "DELETE"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/offre/{offreType}/{id}",
+          "method": "PATCH",
+          "description": "Modifier la date de fin et la date de fin de réception d'une offre.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "offreType",
+              "id"
+            ],
+            "body": [
+              "patchOffreDto"
+            ],
+            "headers": []
+          },
+          "response_schema": "OffreDto",
+          "status_codes": [
+            201,
+            400,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_offre",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_parametrage_offre",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_palier",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_encours",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_taux_uc",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_versement_initial",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_paiements",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_versements",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_palier",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_offre",
+              "operation": "UPDATE"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/offre/{offreType}/{id}",
+          "method": "PUT",
+          "description": "Modifier une offre existante et ses paramétrages.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "offreType",
+              "id"
+            ],
+            "body": [
+              "offre"
+            ],
+            "headers": []
+          },
+          "response_schema": "OffreDto",
+          "status_codes": [
+            201,
+            400,
+            401,
+            403,
+            500
+          ],
+          "validation": "✅ VALID",
+          "data_access": [
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_offre",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_parametrage_offre",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_palier",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_encours",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_taux_uc",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_versement_initial",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_paiements",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_versements",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_palier",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_offre",
+              "operation": "UPDATE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_parametrage_offre",
+              "operation": "UPDATE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_parametrage_offre",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_parametrage_offre",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_encours",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_encours",
+              "operation": "UPDATE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_encours",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_palier",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_palier",
+              "operation": "UPDATE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_palier",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_taux_uc",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_taux_uc",
+              "operation": "UPDATE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_taux_uc",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_versement_initial",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_versement_initial",
+              "operation": "UPDATE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_versement_initial",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_paiements",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_paiements",
+              "operation": "UPDATE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_paiements",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_versements",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_versements",
+              "operation": "UPDATE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_versements",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_palier",
+              "operation": "INSERT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_palier",
+              "operation": "UPDATE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_palier",
+              "operation": "DELETE"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/offre/{offreType}/synchronize-crm",
+          "method": "POST",
+          "description": "Synchroniser les codes promo actifs avec le CRM.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "offreType"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "Aucun contenu",
+          "status_codes": [
+            202,
+            400,
+            401,
+            403,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_offre",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_parametrage_offre",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_palier",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_encours",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_taux_uc",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_versement_initial",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_paiements",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_condition_x_versements",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38_palier",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "crm_codepromo_api",
+              "resource": "/isicrm/api/codepromo/{codepromo}",
+              "operation": "GET"
+            },
+            {
+              "component_id": "crm_codepromo_api",
+              "resource": "/isicrm/api/codepromo",
+              "operation": "POST"
+            },
+            {
+              "component_id": "crm_codepromo_api",
+              "resource": "/isicrm/api/codepromo",
+              "operation": "PUT"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/check",
+          "method": "GET",
+          "description": "Point de santé technique de l'application.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": []
+        }
+      ],
+      "deployment": {
+        "containerized": true,
+        "platform": "Docker",
+        "ci_cd": "GitLab CI"
+      }
+    },
+    {
+      "id": "db_postgres",
+      "label": "Marketing Offer PostgreSQL",
+      "type": "db",
+      "layer": "Data",
+      "technology": "PostgreSQL",
+      "url": "${cloud_postgre_database_marketing_offer_url}",
+      "port": 5432,
+      "consumed_via": "Spring JDBC (NamedParameterJdbcTemplate / JdbcTemplate)",
+      "tables": [
+        {
+          "name": "t38_offre",
+          "purpose": "Référentiel des offres marketing et de leurs périodes de validité"
+        },
+        {
+          "name": "t38_parametrage_offre",
+          "purpose": "Paramétrages des offres par sous-produit et primes associées"
+        },
+        {
+          "name": "t38_produit",
+          "purpose": "Catalogue des produits Fortuneo éligibles aux offres"
+        },
+        {
+          "name": "t38_sous_produit",
+          "purpose": "Catalogue des sous-produits rattachés aux produits"
+        },
+        {
+          "name": "t38_condition_encours",
+          "purpose": "Conditions d'encours applicables aux offres"
+        },
+        {
+          "name": "t38_condition_palier",
+          "purpose": "Conditions à paliers rattachées aux paramétrages d'offre"
+        },
+        {
+          "name": "t38_condition_taux_uc",
+          "purpose": "Conditions de taux d'unités de compte"
+        },
+        {
+          "name": "t38_condition_versement_initial",
+          "purpose": "Conditions de versement initial"
+        },
+        {
+          "name": "t38_condition_x_paiements",
+          "purpose": "Conditions sur le nombre de paiements"
+        },
+        {
+          "name": "t38_condition_x_versements",
+          "purpose": "Conditions sur les versements récurrents"
+        },
+        {
+          "name": "t38_palier",
+          "purpose": "Paliers de prime utilisés par les conditions à paliers"
+        }
+      ]
+    },
+    {
+      "id": "cache_redis",
+      "label": "Redis Cache",
+      "type": "cache",
+      "layer": "Data",
+      "technology": "Redis Sentinel",
+      "url": "${cloud_servers_redis_host_ng}:${cloud_servers_redis_port}",
+      "port": 6379,
+      "consumed_via": "Spring Data Redis + ShedLock"
+    },
+    {
+      "id": "crm_codepromo_api",
+      "label": "CRM CodePromo API",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign)",
+      "url": "${spring.urls.isi-crm}",
+      "consumed_via": "OpenFeign (OkHttp + Jackson)",
+      "endpoints": [
+        {
+          "path": "/isicrm/api/codepromo/{codepromo}",
+          "method": "GET"
+        },
+        {
+          "path": "/isicrm/api/codepromo",
+          "method": "POST"
+        },
+        {
+          "path": "/isicrm/api/codepromo",
+          "method": "PUT"
+        }
+      ],
+      "used_by": [
+        "backend_marketing_offer_api"
+      ]
+    },
+    {
+      "id": "bo_marketing_offer",
+      "label": "Bo Marketing Offer",
+      "type": "frontend",
+      "layer": "Frontend",
+      "technology": "React 18.2.0 + Vite 5.0.11 + @mui/material 5.11.2",
+      "url": "À confirmer",
+      "build_tool": "Vite 5.0.11",
+      "state_management": "@tanstack/react-query 5.59.19 (server-state) + zustand 5.0.1 (client-state) + react-hook-form 7.60.0 (form-state)",
+      "key_dependencies": [
+        "axios 1.2.1",
+        "@fortuneo/fto-bo-security-lib 1.0.16",
+        "@fortuneo/ui 2.6.0",
+        "@fortuneo/ui-react 3.24.0",
+        "react-router-dom 7.1.3",
+        "@sofa/federation 0.2.4"
+      ],
+      "routes": [
+        {
+          "path": "/offres-commerciales",
+          "label": "Entrée / Layout",
+          "authenticated": true,
+          "description": "Précharge les habilitations et paramètres applicatifs puis redirige vers le parcours offres.",
+          "api_calls": [
+            "GET /backoffice/offres-commerciales/app-params"
+          ]
+        },
+        {
+          "path": "/offres-commerciales/unauthorized",
+          "label": "Non autorisé",
+          "authenticated": false,
+          "description": "Affiche le message d’accès non autorisé."
+        },
+        {
+          "path": "/offres-commerciales/:offerType",
+          "label": "Liste des offres",
+          "authenticated": true,
+          "description": "Affiche la liste filtrable des offres et permet leur suppression selon les habilitations.",
+          "api_calls": [
+            "GET /backoffice/offres-commerciales/offre/:offerType",
+            "DELETE /backoffice/offres-commerciales/offre/:type/:id"
+          ]
+        },
+        {
+          "path": "/offres-commerciales/:offerType/view/:id",
+          "label": "Détail d’une offre",
+          "authenticated": true,
+          "description": "Charge le détail d’une offre en lecture seule.",
+          "api_calls": [
+            "GET /backoffice/offres-commerciales/offre/:type/:id"
+          ]
+        },
+        {
+          "path": "/offres-commerciales/:offerType/create",
+          "label": "Créer une offre",
+          "authenticated": true,
+          "description": "Formulaire de création d’offre, réservé aux utilisateurs avec accès FULL.",
+          "api_calls": [
+            "POST /backoffice/offres-commerciales/offre/:type"
+          ]
+        },
+        {
+          "path": "/offres-commerciales/:offerType/edit/:id",
+          "label": "Éditer une offre",
+          "authenticated": true,
+          "description": "Charge puis met à jour une offre existante, avec accès FULL requis.",
+          "api_calls": [
+            "GET /backoffice/offres-commerciales/offre/:type/:id",
+            "PUT /backoffice/offres-commerciales/offre/:type/:id",
+            "PATCH /backoffice/offres-commerciales/offre/:type/:id"
+          ]
+        },
+        {
+          "path": "/offres-commerciales/:offerType/duplicate/:id",
+          "label": "Dupliquer une offre",
+          "authenticated": true,
+          "description": "Charge une offre existante pour la dupliquer puis enregistre la copie, avec accès FULL requis.",
+          "api_calls": [
+            "GET /backoffice/offres-commerciales/offre/:type/:id",
+            "POST /backoffice/offres-commerciales/offre/:type"
+          ]
+        }
+      ],
+      "deployment": {
+        "ci_cd": "GitLab CI"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "backend_marketing_offer_api_to_crm_codepromo_api",
+      "from": "backend_marketing_offer_api",
+      "to": "crm_codepromo_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true
+    },
+    {
+      "id": "bo_marketing_offer_to_backend_marketing_offer_api",
+      "from": "bo_marketing_offer",
+      "to": "backend_marketing_offer_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Appels REST du frontend React vers l'API Marketing Offer via la gateway sécurisée.",
+      "client": "axios",
+      "flow": "Browser → gateway sécurisée → backend_marketing_offer_api → réponse JSON",
+      "note": "Le frontend appelle les routes publiques /backoffice/offres-commerciales/*, réécrites côté gateway vers /api/v1/*.",
+      "endpoint_mappings": [
+        {
+          "frontend_endpoint": "GET /backoffice/offres-commerciales/app-params",
+          "backend_endpoint": "/api/v1/app-params",
+          "method": "GET",
+          "frontend_pages": [
+            "/offres-commerciales"
+          ],
+          "purpose": "Charger les paramètres applicatifs",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /backoffice/offres-commerciales/offre/:offerType",
+          "backend_endpoint": "/api/v1/offre/{offreType}",
+          "method": "GET",
+          "frontend_pages": [
+            "/offres-commerciales/:offerType"
+          ],
+          "purpose": "Récupérer la liste filtrable des offres",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "DELETE /backoffice/offres-commerciales/offre/:type/:id",
+          "backend_endpoint": "/api/v1/offre/{offreType}/{id}",
+          "method": "DELETE",
+          "frontend_pages": [
+            "/offres-commerciales/:offerType"
+          ],
+          "purpose": "Supprimer une offre",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "GET /backoffice/offres-commerciales/offre/:type/:id",
+          "backend_endpoint": "/api/v1/offre/{offreType}/{idOffre}",
+          "method": "GET",
+          "frontend_pages": [
+            "/offres-commerciales/:offerType/view/:id",
+            "/offres-commerciales/:offerType/edit/:id",
+            "/offres-commerciales/:offerType/duplicate/:id"
+          ],
+          "purpose": "Charger le détail d'une offre pour consultation, édition ou duplication",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "POST /backoffice/offres-commerciales/offre/:type",
+          "backend_endpoint": "/api/v1/offre/{offreType}",
+          "method": "POST",
+          "frontend_pages": [
+            "/offres-commerciales/:offerType/create",
+            "/offres-commerciales/:offerType/duplicate/:id"
+          ],
+          "purpose": "Créer une offre ou enregistrer une duplication",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "PUT /backoffice/offres-commerciales/offre/:type/:id",
+          "backend_endpoint": "/api/v1/offre/{offreType}/{id}",
+          "method": "PUT",
+          "frontend_pages": [
+            "/offres-commerciales/:offerType/edit/:id"
+          ],
+          "purpose": "Mettre à jour complètement une offre",
+          "status": "✅ MAPPÉ"
+        },
+        {
+          "frontend_endpoint": "PATCH /backoffice/offres-commerciales/offre/:type/:id",
+          "backend_endpoint": "/api/v1/offre/{offreType}/{id}",
+          "method": "PATCH",
+          "frontend_pages": [
+            "/offres-commerciales/:offerType/edit/:id"
+          ],
+          "purpose": "Modifier partiellement une offre active",
+          "status": "✅ MAPPÉ"
+        }
+      ]
+    },
+    {
+      "id": "backend_marketing_offer_api_to_db_postgres",
+      "from": "backend_marketing_offer_api",
+      "to": "db_postgres",
+      "protocol": "JDBC",
+      "authenticated": false,
+      "description": "Accès persistant du backend aux tables PostgreSQL pour la consultation, création, mise à jour et suppression des offres marketing et de leurs paramétrages.",
+      "client": "Spring JDBC (NamedParameterJdbcTemplate / JdbcTemplate)",
+      "flow": "backend_marketing_offer_api → requêtes SQL → db_postgres",
+      "operations": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    },
+    {
+      "id": "backend_marketing_offer_api_to_cache_redis",
+      "from": "backend_marketing_offer_api",
+      "to": "cache_redis",
+      "protocol": "Redis",
+      "authenticated": false,
+      "description": "Utilisation de Redis Sentinel par le backend pour le cache applicatif et les mécanismes de verrouillage planifié.",
+      "client": "Spring Data Redis + ShedLock",
+      "flow": "backend_marketing_offer_api → cache/locks Redis → réponse applicative",
+      "operations": [
+        "GET",
+        "SET",
+        "DELETE",
+        "EXPIRE"
+      ],
+      "cache_strategy": "Cache-aside"
+    }
+  ]
+}

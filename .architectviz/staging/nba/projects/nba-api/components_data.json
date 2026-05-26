@@ -1,0 +1,40 @@
+[
+  {
+    "id": "db_oracle",
+    "label": "Oracle",
+    "type": "db",
+    "layer": "Data",
+    "technology": "Oracle",
+    "url": "${cloud_oracle_database_fortuneo_url}",
+    "port": 1521,
+    "consumed_via": "Spring JDBC (NamedParameterJdbcTemplate)",
+    "description": "Base Oracle Sympho utilisée pour lire les recommandations NBA calculées pour les clients.",
+    "tables": [
+      {
+        "name": "T38NBA",
+        "purpose": "Table des recommandations Next Best Action par client, contenant la priorité, le code action et le niveau de recommandation."
+      }
+    ]
+  },
+  {
+    "id": "cache_spring_local",
+    "label": "Spring Local Cache",
+    "type": "cache",
+    "layer": "Data",
+    "technology": "Spring Cache + ConcurrentMapCache + Guava",
+    "consumed_via": "@Cacheable",
+    "description": "Cache mémoire local utilisé pour éviter de recharger à chaque appel les référentiels d'actions et de produits.",
+    "cached_data": [
+      {
+        "key_pattern": "actions",
+        "ttl": "24h",
+        "purpose": "Référentiel des actions NBA récupéré via Gesparam."
+      },
+      {
+        "key_pattern": "products",
+        "ttl": "24h",
+        "purpose": "Référentiel des produits NBA récupéré via Gesparam."
+      }
+    ]
+  }
+]

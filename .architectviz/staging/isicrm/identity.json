@@ -1,0 +1,7 @@
+{
+  "architecture": "Isicrm",
+  "type": "BACKEND",
+  "version": "0.1.0",
+  "lastUpdated": "2026-05-21",
+  "description": "Cartographie du SI ISI-CRM et de ses dépendances métiers et techniques, incluant le backend ISI-CRM, le CRM Merlin/Edeal, les services Thrift Fortuneo, les caches Redis et les bus événementiels."
+}

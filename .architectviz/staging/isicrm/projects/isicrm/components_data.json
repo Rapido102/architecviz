@@ -1,0 +1,58 @@
+[
+  {
+    "id": "redis_cache",
+    "label": "Redis Sentinel Cache",
+    "type": "cache",
+    "layer": "Data",
+    "technology": "Redis Sentinel",
+    "url": "${REDIS_URL}",
+    "port": 26379,
+    "consumed_via": "JedisSentinelPool",
+    "cached_data": [
+      {
+        "endpoint": "/api/parametrage/*",
+        "key_pattern": "PARAMETRAGE_EVENEMENT_CRM",
+        "ttl": "12h",
+        "purpose": "Cache du paramétrage des événements CRM récupéré depuis Gesparam"
+      },
+      {
+        "endpoint": "/api/parametrage/*",
+        "key_pattern": "PARAMETRAGE_SDCQ",
+        "ttl": "12h",
+        "purpose": "Cache du paramétrage des qualifications récupéré depuis Gesparam"
+      },
+      {
+        "endpoint": "/api/parametrage/*",
+        "key_pattern": "PARAMETRAGE_SDCT",
+        "ttl": "12h",
+        "purpose": "Cache du paramétrage des statuts et transcodages récupéré depuis Gesparam"
+      }
+    ],
+    "note": "Configuration Redis Sentinel détectée dans cache.properties ; nom de master observé : 21.3883.isicrm.",
+    "description": "Cache technique partagé utilisé par ISI-CRM pour éviter des appels répétés aux services de paramétrage et accélérer la résolution des tables métier et transcodifications."
+  },
+  {
+    "id": "ibm_mq",
+    "label": "IBM MQ",
+    "type": "mq",
+    "layer": "Data",
+    "technology": "IBM MQ + JMS",
+    "url": "${IBM_MQ_URL}",
+    "port": 1414,
+    "consumed_via": "JMS",
+    "note": "Configuration détectée dans jmsconf.xml ; queueManager=mqtuxdev, channels MQTUXDEV.FORTUNEO / MQTUXDEV.FTO.ISICRM. Queues observées : 3883.PANIER_ISICRM.EVENEMENTCRM.21, 3883.CREDITCONSO_ISICRM.EVENEMENTCRM.21, 3883.CRMEVENTWEBHOOK_ISICRM.EVENEMENTCRM.21, 3883.PERSONSYNC_ISICRM.EVENEMENTCRM.21, 3883.KYCSYNC_ISICRM.EVENEMENTCRM.21.",
+    "description": "Bus JMS legacy utilisé pour transporter des événements CRM et synchronisations asynchrones entre ISI-CRM et d’autres systèmes Fortuneo."
+  },
+  {
+    "id": "kafka_cluster",
+    "label": "Kafka Cluster",
+    "type": "mq",
+    "layer": "Data",
+    "technology": "Apache Kafka + spring-kafka 2.9.13 + SSL",
+    "url": "${KAFKA_BOOTSTRAP_SERVERS}",
+    "port": 9092,
+    "consumed_via": "KafkaTemplate + @KafkaListener",
+    "note": "Bootstrap server configuré via /kafka/bootstrapAddress. Consumer détecté sur le topic 1C36.contestationwkfapi.generic.21. Producer détecté vers le topic 3883.isi-crm.EventSync.21.",
+    "description": "Bus Kafka utilisé par ISI-CRM pour publier et consommer des événements d’intégration, notamment autour de la synchronisation métier et des workflows contestation."
+  }
+]

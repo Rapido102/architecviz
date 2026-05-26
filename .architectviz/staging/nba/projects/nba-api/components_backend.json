@@ -1,0 +1,232 @@
+[
+  {
+    "id": "backend_spring",
+    "label": "Backend Spring",
+    "type": "backend",
+    "layer": "Backend",
+    "technology": "Java 25 + Spring Boot 4.0.2 + Jersey (JAX-RS) + OpenFeign 13.6",
+    "url": "À confirmer",
+    "port": 8080,
+    "description": "API REST NBA (Next Best Actions) exposant des recommandations d'actions et de produits pour les points de contact client, à destination notamment de l'application mobile et d'EDEAL.",
+    "authentication": {
+      "type": "JWT Bearer Token",
+      "provider": "Filtre d'authentification partagé Arkéa (JAX-RS)",
+      "token_format": "Authentication: <JWT>",
+      "token_expiry": "Géré par le fournisseur du JWT",
+      "roles_permissions": "Aucun contrôle de rôles explicite détecté ; accès protégé au niveau endpoint via @AuthenticationRequired",
+      "note": "Seul l'endpoint /api/v1/actions/authenticated nécessite une authentification. Le JWT doit contenir le numéro de personne et l'origine d'appel."
+    },
+    "endpoints": [
+      {
+        "path": "/api/v1/actions",
+        "method": "GET",
+        "description": "Récupère les actions recommandées pour un client à partir de son code CRM, avec filtrage par origine et limite de résultats.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "prospectRef",
+            "limit",
+            "origin"
+          ],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "Actions",
+        "status_codes": [
+          200,
+          400,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "T38NBA",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "gesparam_service",
+            "resource": "/gesparamservices/api/v1/tables/T38NACT?CD_EFS={efsCode}",
+            "operation": "GET"
+          },
+          {
+            "component_id": "gesparam_service",
+            "resource": "/gesparamservices/api/v1/tables/T38NPRD?CD_EFS={efsCode}",
+            "operation": "GET"
+          },
+          {
+            "component_id": "cache_spring_local",
+            "resource": "actions",
+            "operation": "GET"
+          },
+          {
+            "component_id": "cache_spring_local",
+            "resource": "actions",
+            "operation": "SET",
+            "note": "@Cacheable sur ActionRepository.getActions(), TTL 24h"
+          },
+          {
+            "component_id": "cache_spring_local",
+            "resource": "products",
+            "operation": "GET"
+          },
+          {
+            "component_id": "cache_spring_local",
+            "resource": "products",
+            "operation": "SET",
+            "note": "@Cacheable sur ProductRepository.getProducts(), TTL 24h"
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/actions/authenticated",
+        "method": "GET",
+        "description": "Récupère les actions recommandées pour un client authentifié en extrayant le numéro de personne et l'origine depuis le JWT ou le paramètre de requête.",
+        "authenticated": true,
+        "params": {
+          "query": [
+            "limit",
+            "origin"
+          ],
+          "path": [],
+          "body": [],
+          "headers": [
+            "Authentication"
+          ]
+        },
+        "response_schema": "Actions",
+        "status_codes": [
+          200,
+          400,
+          401,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "T38NBA",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "gesparam_service",
+            "resource": "/gesparamservices/api/v1/tables/T38NACT?CD_EFS={efsCode}",
+            "operation": "GET"
+          },
+          {
+            "component_id": "gesparam_service",
+            "resource": "/gesparamservices/api/v1/tables/T38NPRD?CD_EFS={efsCode}",
+            "operation": "GET"
+          },
+          {
+            "component_id": "cache_spring_local",
+            "resource": "actions",
+            "operation": "GET"
+          },
+          {
+            "component_id": "cache_spring_local",
+            "resource": "actions",
+            "operation": "SET",
+            "note": "@Cacheable sur ActionRepository.getActions(), TTL 24h"
+          },
+          {
+            "component_id": "cache_spring_local",
+            "resource": "products",
+            "operation": "GET"
+          },
+          {
+            "component_id": "cache_spring_local",
+            "resource": "products",
+            "operation": "SET",
+            "note": "@Cacheable sur ProductRepository.getProducts(), TTL 24h"
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/products",
+        "method": "GET",
+        "description": "Récupère les produits recommandés pour un client ; si aucune action NBA n'est disponible, renvoie l'ensemble des produits triés par priorité.",
+        "authenticated": false,
+        "params": {
+          "query": [
+            "prospectRef",
+            "limit"
+          ],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "Products",
+        "status_codes": [
+          200,
+          400,
+          500
+        ],
+        "validation": "✅ VALID",
+        "data_access": [
+          {
+            "component_id": "db_oracle",
+            "resource": "T38NBA",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "gesparam_service",
+            "resource": "/gesparamservices/api/v1/tables/T38NACT?CD_EFS={efsCode}",
+            "operation": "GET"
+          },
+          {
+            "component_id": "gesparam_service",
+            "resource": "/gesparamservices/api/v1/tables/T38NPRD?CD_EFS={efsCode}",
+            "operation": "GET"
+          },
+          {
+            "component_id": "cache_spring_local",
+            "resource": "actions",
+            "operation": "GET"
+          },
+          {
+            "component_id": "cache_spring_local",
+            "resource": "actions",
+            "operation": "SET",
+            "note": "@Cacheable sur ActionRepository.getActions(), TTL 24h"
+          },
+          {
+            "component_id": "cache_spring_local",
+            "resource": "products",
+            "operation": "GET"
+          },
+          {
+            "component_id": "cache_spring_local",
+            "resource": "products",
+            "operation": "SET",
+            "note": "@Cacheable sur ProductRepository.getProducts(), TTL 24h"
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/check",
+        "method": "GET",
+        "description": "Endpoint de healthcheck applicatif utilisé pour vérifier la disponibilité du service.",
+        "authenticated": false,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": []
+      }
+    ],
+    "deployment": {
+      "containerized": true,
+      "platform": "Docker",
+      "ci_cd": "GitLab CI + Jenkins"
+    }
+  }
+]

@@ -1,0 +1,721 @@
+{
+  "architecture": "notify-records-consumer",
+  "type": "BACKEND",
+  "version": "0.1.0",
+  "lastUpdated": "2026-05-21",
+  "description": "To make it easy for you to get started with GitLab, here's a list of recommended next steps.",
+  "layers": [
+    {
+      "name": "Frontend",
+      "color": "#E3F2FD",
+      "description": "Couche présentation — interfaces utilisateur, SPA, MFE"
+    },
+    {
+      "name": "Backend",
+      "color": "#FFF3E0",
+      "description": "Couche métier — API REST, services, traitements"
+    },
+    {
+      "name": "Data",
+      "color": "#F3E5F5",
+      "description": "Couche persistance — bases de données, cache, files"
+    },
+    {
+      "name": "External",
+      "color": "#E8F5E9",
+      "description": "Services externes / tiers — APIs partenaires, IAM, monitoring"
+    }
+  ],
+  "components": [
+    {
+      "id": "backend_notify_webhook",
+      "label": "Notify Webhook Backend",
+      "type": "backend",
+      "layer": "Backend",
+      "technology": "Java 25 + Spring Boot 4.0.1 + Jersey (JAX-RS)",
+      "url": "À confirmer",
+      "authentication": {
+        "type": "Aucune (endpoints permitAll)",
+        "provider": "Aucun",
+        "token_format": "N/A",
+        "token_expiry": "N/A",
+        "roles_permissions": "Aucun",
+        "note": "La SecurityFilterChain autorise toutes les requêtes. Un filtre JAX-RS @ValidAuthorizationRequired existe et délègue la validation d'un bearer token à oauth_api, mais aucune ressource détectée n'utilise cette annotation."
+      },
+      "endpoints": [
+        {
+          "path": "/api/v1/webhook",
+          "method": "POST",
+          "description": "Reçoit un webhook Notify puis publie un événement Kafka contenant le payload reçu.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "NotifyWebhook"
+            ],
+            "headers": []
+          },
+          "response_schema": "void",
+          "status_codes": [
+            204,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "mq_kafka",
+              "resource": "${cloud_kafka_notify_webhook_notifications_topic_name}",
+              "operation": "PUBLISH",
+              "note": "Publication via KafkaTemplate<String, ArkeaEvent<?>>"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/check",
+          "method": "GET",
+          "description": "Retourne un message texte indiquant que l'API est disponible.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": []
+        }
+      ],
+      "deployment": {
+        "containerized": true,
+        "platform": "Docker",
+        "ci_cd": "GitLab CI"
+      },
+      "description": "API backend recevant les webhooks Notify et republie leur payload sous forme d'événements Kafka. Expose aussi un endpoint de healthcheck simple.",
+      "port": 8080
+    },
+    {
+      "id": "iam_oidc",
+      "label": "OIDC Provider",
+      "type": "iam",
+      "layer": "External",
+      "technology": "OIDC",
+      "url": "${OIDC_ISSUER_URI}",
+      "used_by": [
+        "backend_notify_webhook"
+      ],
+      "description": "Fournisseur d'identité OIDC de la plateforme, référencé par la configuration OAuth2/Spring Security du service notify-webhook."
+    },
+    {
+      "id": "event_api",
+      "label": "Event API",
+      "description": "Webhook CRM interne appelé pour créer un événement ou une interaction CRM après la livraison d'une notification Notify.",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign)",
+      "url": "${application.configurations.client.rest.event.url}",
+      "consumed_via": "OpenFeign",
+      "endpoints": [
+        {
+          "path": "/CREER_EVENEMENT",
+          "method": "POST",
+          "description": "Crée un événement CRM à partir du payload Notify transformé."
+        }
+      ],
+      "used_by": [
+        "backend_notify_crm_consumer"
+      ]
+    },
+    {
+      "id": "db_postgres",
+      "label": "PostgreSQL",
+      "description": "Bases PostgreSQL utilisées par les services Notify pour persister l’historique des notifications, les mappings de dispatch et les erreurs de traitement rejouables.",
+      "type": "db",
+      "layer": "Data",
+      "technology": "PostgreSQL",
+      "url": "${DATASOURCE_URL}",
+      "port": 5432,
+      "consumed_via": "Spring JDBC",
+      "tables": [
+        {
+          "name": "T38NOTIFY_RECORDS",
+          "purpose": "Stocke les notifications Notify avec leur identifiant, statut, template, contenu, sujet, destinataire, métadonnées et horodatages de création/mise à jour."
+        },
+        {
+          "name": "t38event_mapping_notify",
+          "purpose": "Associe chaque type d'événement aux paramètres de notification à utiliser, notamment canal et template."
+        },
+        {
+          "name": "t38err_notify_disp",
+          "purpose": "Conserve les erreurs de dispatch de notifications afin de permettre leur consultation, leur rejeu et leur suppression."
+        }
+      ]
+    },
+    {
+      "id": "cache_redis",
+      "label": "Redis Cache",
+      "description": "Cache Redis utilisé par notify-events-dispatcher pour mémoriser les paramètres de dispatch et certains jetons OAuth nécessaires aux appels externes.",
+      "type": "cache",
+      "layer": "Data",
+      "technology": "Redis",
+      "url": "${REDIS_URL}",
+      "port": 6379,
+      "consumed_via": "Spring Data Redis",
+      "cached_data": [
+        {
+          "key_pattern": "notif_params::*",
+          "ttl": "10000ms",
+          "purpose": "Mapping des événements vers template/canal chargé depuis la table t38event_mapping_notify."
+        },
+        {
+          "key_pattern": "OAUTH_TOKEN::{team}",
+          "ttl": "À confirmer",
+          "purpose": "Jetons OAuth Cognito mis en cache par équipe pour appeler l'API Notify."
+        }
+      ]
+    },
+    {
+      "id": "mq_kafka",
+      "label": "Kafka",
+      "description": "Cluster Kafka utilisé comme bus d'événements pour consommer les événements métiers entrants déclenchant l'envoi de notifications.",
+      "type": "mq",
+      "layer": "Data",
+      "technology": "Apache Kafka",
+      "url": "${KAFKA_BOOTSTRAP}",
+      "consumed_via": "Spring Kafka"
+    },
+    {
+      "id": "clientapi_client_api",
+      "label": "Clientapi-client API",
+      "description": "API client interne utilisée pour récupérer les moyens de contact d'un client avant l'envoi d'une notification.",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign)",
+      "url": "${application.configurations.client.rest.clientapi.url}",
+      "consumed_via": "OpenFeign",
+      "endpoints": [
+        {
+          "path": "/private/persons/{ciphered_no_pse}/contacts",
+          "method": "GET",
+          "description": "Retourne les coordonnées de contact d'une personne à partir de son numéro chiffré."
+        }
+      ],
+      "used_by": [
+        "backend_notify_events_dispatcher"
+      ]
+    },
+    {
+      "id": "cognito_client_api",
+      "label": "Cognito-client API",
+      "description": "Service Cognito/OAuth appelé en client_credentials pour obtenir les jetons techniques utilisés lors des appels sortants vers Notify.",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign)",
+      "url": "${application.configurations.client.rest.cognito.url}",
+      "consumed_via": "OpenFeign",
+      "used_by": [
+        "backend_notify_events_dispatcher"
+      ],
+      "endpoints": [
+        {
+          "path": "/",
+          "method": "POST",
+          "description": "Délivre un access token technique Cognito en grant client_credentials."
+        }
+      ]
+    },
+    {
+      "id": "notify_client_api",
+      "label": "Notify-client API",
+      "description": "API Notify utilisée pour créer les notifications clients à partir des événements métier dispatchés.",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign)",
+      "url": "${application.configurations.client.rest.notify.url}",
+      "consumed_via": "OpenFeign",
+      "endpoints": [
+        {
+          "path": "/v2/notifications",
+          "method": "POST",
+          "description": "Crée et envoie une notification vers un destinataire donné."
+        }
+      ],
+      "used_by": [
+        "backend_notify_events_dispatcher"
+      ]
+    },
+    {
+      "id": "oauth_api",
+      "label": "Oauth API",
+      "description": "Service OAuth externe utilisé par notify-webhook pour vérifier la validité d'un bearer token via l'endpoint /oauth2/token/check.",
+      "type": "third-party",
+      "layer": "External",
+      "technology": "REST API (OpenFeign)",
+      "url": "${application.configurations.client.rest.oauth.url}",
+      "consumed_via": "OpenFeign",
+      "endpoints": [
+        {
+          "path": "/oauth2/token/check",
+          "method": "POST",
+          "description": "Vérifie la validité d'un bearer token transmis par le webhook."
+        }
+      ],
+      "used_by": [
+        "backend_notify_webhook"
+      ]
+    },
+    {
+      "id": "backend_notify_crm_consumer",
+      "label": "Notify CRM Consumer Backend",
+      "description": "Consumer Kafka qui écoute les événements Notify livrés puis appelle l’API CRM interne pour créer les événements d’interaction correspondants.",
+      "type": "backend",
+      "layer": "Backend",
+      "technology": "Java 25 + Spring Boot 4.0.1 + Jersey (JAX-RS) + Spring Kafka + OpenFeign",
+      "url": "À confirmer",
+      "port": 8080,
+      "authentication": {
+        "type": "Aucune (endpoints permitAll)",
+        "provider": "Aucun",
+        "token_format": "N/A",
+        "token_expiry": "N/A",
+        "roles_permissions": "Aucun",
+        "note": "La SecurityFilterChain autorise toutes les requêtes; seul l’endpoint de healthcheck HTTP est exposé, le traitement métier principal passe par un consumer Kafka."
+      },
+      "endpoints": [
+        {
+          "path": "/api/v1/check",
+          "method": "GET",
+          "description": "Expose un healthcheck applicatif.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": []
+        }
+      ],
+      "deployment": {
+        "containerized": true,
+        "platform": "Docker",
+        "ci_cd": "GitLab CI"
+      }
+    },
+    {
+      "id": "backend_notify_events_dispatcher",
+      "label": "Notify Events Dispatcher Backend",
+      "description": "Service de dispatch qui consomme des événements métiers, résout les paramètres d’envoi, récupère les coordonnées client puis appelle Notify. Il expose aussi des endpoints techniques de rejeu et de purge de cache.",
+      "type": "backend",
+      "layer": "Backend",
+      "technology": "Java 25 + Spring Boot 4.0.1 + Jersey (JAX-RS) + Spring Kafka + Spring JDBC + OpenFeign",
+      "url": "À confirmer",
+      "port": 8080,
+      "authentication": {
+        "type": "Spring Security (règles effectives à confirmer)",
+        "provider": "Aucun provider explicite détecté",
+        "token_format": "À confirmer",
+        "token_expiry": "À confirmer",
+        "roles_permissions": "À confirmer",
+        "note": "La SecurityFilterChain désactive CSRF mais ne déclare pas explicitement de règles d’autorisation. Vérifier si les endpoints techniques sont protégés par la configuration Spring Security par défaut ou par l’infrastructure."
+      },
+      "endpoints": [
+        {
+          "path": "/api/v1/tech/error/replay/{errorId}",
+          "method": "POST",
+          "description": "Recharge une erreur persistée, rejoue l’événement associé puis supprime l’enregistrement d’erreur.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [
+              "errorId"
+            ],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "Response",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_postgres",
+              "resource": "t38err_notify_disp",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38err_notify_disp",
+              "operation": "DELETE"
+            },
+            {
+              "component_id": "db_postgres",
+              "resource": "t38event_mapping_notify",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "cache_redis",
+              "resource": "notif_params::*",
+              "operation": "GET"
+            },
+            {
+              "component_id": "cache_redis",
+              "resource": "notif_params::*",
+              "operation": "SET"
+            },
+            {
+              "component_id": "clientapi_client_api",
+              "resource": "/private/persons/{ciphered_no_pse}/contacts",
+              "operation": "GET"
+            },
+            {
+              "component_id": "cache_redis",
+              "resource": "OAUTH_TOKEN::{team}",
+              "operation": "GET"
+            },
+            {
+              "component_id": "cache_redis",
+              "resource": "OAUTH_TOKEN::{team}",
+              "operation": "SET"
+            },
+            {
+              "component_id": "cognito_client_api",
+              "resource": "/",
+              "operation": "POST",
+              "note": "Appel effectué sur miss/expiration du cache token."
+            },
+            {
+              "component_id": "notify_client_api",
+              "resource": "/v2/notifications",
+              "operation": "POST"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/tech/event",
+          "method": "POST",
+          "description": "Joue manuellement un événement métier et déclenche le pipeline complet de dispatch de notification.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [
+              "ArkeaEvent<Object>"
+            ],
+            "headers": []
+          },
+          "response_schema": "Response",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "db_postgres",
+              "resource": "t38event_mapping_notify",
+              "operation": "SELECT"
+            },
+            {
+              "component_id": "cache_redis",
+              "resource": "notif_params::*",
+              "operation": "GET"
+            },
+            {
+              "component_id": "cache_redis",
+              "resource": "notif_params::*",
+              "operation": "SET"
+            },
+            {
+              "component_id": "clientapi_client_api",
+              "resource": "/private/persons/{ciphered_no_pse}/contacts",
+              "operation": "GET"
+            },
+            {
+              "component_id": "cache_redis",
+              "resource": "OAUTH_TOKEN::{team}",
+              "operation": "GET"
+            },
+            {
+              "component_id": "cache_redis",
+              "resource": "OAUTH_TOKEN::{team}",
+              "operation": "SET"
+            },
+            {
+              "component_id": "cognito_client_api",
+              "resource": "/",
+              "operation": "POST",
+              "note": "Appel effectué sur miss/expiration du cache token."
+            },
+            {
+              "component_id": "notify_client_api",
+              "resource": "/v2/notifications",
+              "operation": "POST"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/tech/mapping/flush",
+          "method": "POST",
+          "description": "Vide le cache Redis des mappings événement → notification.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "Response",
+          "status_codes": [
+            200,
+            500
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": [
+            {
+              "component_id": "cache_redis",
+              "resource": "notif_params::*",
+              "operation": "DEL"
+            }
+          ]
+        },
+        {
+          "path": "/api/v1/check",
+          "method": "GET",
+          "description": "Expose un healthcheck applicatif.",
+          "authenticated": true,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": []
+        }
+      ],
+      "deployment": {
+        "containerized": true,
+        "platform": "Docker",
+        "ci_cd": "GitLab CI"
+      }
+    },
+    {
+      "id": "backend_notify_records_consumer",
+      "label": "Notify Records Consumer Backend",
+      "description": "Consumer Kafka qui reçoit les événements Notify, normalise le payload puis persiste l’historique et les changements d’état des notifications en base PostgreSQL.",
+      "type": "backend",
+      "layer": "Backend",
+      "technology": "Java 25 + Spring Boot 4.0.1 + Jersey (JAX-RS) + Spring Kafka + Spring JDBC",
+      "url": "À confirmer",
+      "port": 8080,
+      "authentication": {
+        "type": "Aucune (endpoints permitAll)",
+        "provider": "Aucun",
+        "token_format": "N/A",
+        "token_expiry": "N/A",
+        "roles_permissions": "Aucun",
+        "note": "La SecurityFilterChain autorise toutes les requêtes; seul l’endpoint de healthcheck HTTP est exposé, le traitement métier principal passe par un consumer Kafka."
+      },
+      "endpoints": [
+        {
+          "path": "/api/v1/check",
+          "method": "GET",
+          "description": "Expose un healthcheck applicatif.",
+          "authenticated": false,
+          "params": {
+            "query": [],
+            "path": [],
+            "body": [],
+            "headers": []
+          },
+          "response_schema": "String",
+          "status_codes": [
+            200
+          ],
+          "validation": "⚠️ NON VALIDÉ",
+          "data_access": []
+        }
+      ],
+      "deployment": {
+        "containerized": true,
+        "platform": "Docker",
+        "ci_cd": "GitLab CI"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "backend_notify_webhook_to_iam_oidc",
+      "from": "backend_notify_webhook",
+      "to": "iam_oidc",
+      "protocol": "OIDC/HTTPS",
+      "authenticated": false,
+      "description": "Le backend webhook s'appuie sur la configuration OIDC de la plateforme pour ses besoins d'authentification fédérée."
+    },
+    {
+      "id": "backend_notify_webhook_to_event_api",
+      "from": "backend_notify_webhook",
+      "to": "event_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true
+    },
+    {
+      "id": "backend_notify_webhook_to_clientapi_client_api",
+      "from": "backend_notify_webhook",
+      "to": "clientapi_client_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true
+    },
+    {
+      "id": "backend_notify_webhook_to_cognito_client_api",
+      "from": "backend_notify_webhook",
+      "to": "cognito_client_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true
+    },
+    {
+      "id": "backend_notify_webhook_to_notify_client_api",
+      "from": "backend_notify_webhook",
+      "to": "notify_client_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true
+    },
+    {
+      "id": "backend_notify_webhook_to_oauth_api",
+      "from": "backend_notify_webhook",
+      "to": "oauth_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Le service webhook délègue la vérification des bearer tokens à l'API OAuth."
+    },
+    {
+      "id": "backend_notify_crm_consumer_to_event_api",
+      "from": "backend_notify_crm_consumer",
+      "to": "event_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Le consumer CRM appelle l'API event pour créer les interactions CRM issues des notifications livrées."
+    },
+    {
+      "id": "backend_notify_events_dispatcher_to_clientapi_client_api",
+      "from": "backend_notify_events_dispatcher",
+      "to": "clientapi_client_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Le dispatcher récupère les coordonnées de contact client avant d'envoyer une notification."
+    },
+    {
+      "id": "backend_notify_events_dispatcher_to_cognito_client_api",
+      "from": "backend_notify_events_dispatcher",
+      "to": "cognito_client_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Le dispatcher obtient des jetons techniques Cognito pour authentifier les appels sortants vers Notify."
+    },
+    {
+      "id": "backend_notify_events_dispatcher_to_notify_client_api",
+      "from": "backend_notify_events_dispatcher",
+      "to": "notify_client_api",
+      "protocol": "REST/HTTPS",
+      "authenticated": true,
+      "description": "Le dispatcher appelle Notify pour créer et envoyer les notifications."
+    },
+    {
+      "id": "backend_notify_webhook_to_mq_kafka",
+      "from": "backend_notify_webhook",
+      "to": "mq_kafka",
+      "protocol": "Kafka/SSL",
+      "authenticated": true,
+      "description": "Le webhook republie les événements Notify entrants sur Kafka."
+    },
+    {
+      "id": "backend_notify_events_dispatcher_to_iam_oidc",
+      "from": "backend_notify_events_dispatcher",
+      "to": "iam_oidc",
+      "protocol": "OIDC/HTTPS",
+      "authenticated": false,
+      "description": "Le dispatcher référence le provider OIDC commun du SI via la configuration de sécurité partagée."
+    },
+    {
+      "id": "backend_notify_events_dispatcher_to_mq_kafka",
+      "from": "backend_notify_events_dispatcher",
+      "to": "mq_kafka",
+      "protocol": "Kafka/SSL",
+      "authenticated": true,
+      "description": "Le dispatcher consomme les événements métiers entrants depuis Kafka."
+    },
+    {
+      "id": "backend_notify_events_dispatcher_to_db_postgres",
+      "from": "backend_notify_events_dispatcher",
+      "to": "db_postgres",
+      "protocol": "JDBC/SSL",
+      "authenticated": true,
+      "description": "Le dispatcher lit les mappings événement → notification et gère les erreurs de traitement en base."
+    },
+    {
+      "id": "backend_notify_events_dispatcher_to_cache_redis",
+      "from": "backend_notify_events_dispatcher",
+      "to": "cache_redis",
+      "protocol": "Redis/Sentinel",
+      "authenticated": true,
+      "description": "Le dispatcher met en cache les mappings de dispatch et certains jetons OAuth techniques dans Redis."
+    },
+    {
+      "id": "backend_notify_records_consumer_to_iam_oidc",
+      "from": "backend_notify_records_consumer",
+      "to": "iam_oidc",
+      "protocol": "OIDC/HTTPS",
+      "authenticated": false,
+      "description": "Le consumer d'archivage référence le provider OIDC commun du SI via la configuration de sécurité partagée."
+    },
+    {
+      "id": "backend_notify_records_consumer_to_mq_kafka",
+      "from": "backend_notify_records_consumer",
+      "to": "mq_kafka",
+      "protocol": "Kafka/SSL",
+      "authenticated": true,
+      "description": "Le consumer d'archivage lit les événements Notify depuis Kafka."
+    },
+    {
+      "id": "backend_notify_records_consumer_to_db_postgres",
+      "from": "backend_notify_records_consumer",
+      "to": "db_postgres",
+      "protocol": "JDBC/SSL",
+      "authenticated": true,
+      "description": "Le consumer d'archivage persiste l'historique des notifications et leurs changements d'état en PostgreSQL."
+    },
+    {
+      "id": "backend_notify_crm_consumer_to_iam_oidc",
+      "from": "backend_notify_crm_consumer",
+      "to": "iam_oidc",
+      "protocol": "OIDC/HTTPS",
+      "authenticated": false,
+      "description": "Le consumer CRM référence le provider OIDC commun du SI via la configuration de sécurité partagée."
+    },
+    {
+      "id": "backend_notify_crm_consumer_to_mq_kafka",
+      "from": "backend_notify_crm_consumer",
+      "to": "mq_kafka",
+      "protocol": "Kafka/SSL",
+      "authenticated": true,
+      "description": "Le consumer CRM lit les événements Notify livrés depuis Kafka."
+    }
+  ]
+}

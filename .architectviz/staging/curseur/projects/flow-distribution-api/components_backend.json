@@ -1,0 +1,24 @@
+[
+  {
+    "id": "backend_spring",
+    "label": "Backend Spring",
+    "type": "backend",
+    "layer": "Backend",
+    "technology": "Spring Boot (version à confirmer)",
+    "url": "À confirmer",
+    "authentication": {
+      "type": "À confirmer",
+      "provider": "À confirmer",
+      "token_format": "À confirmer",
+      "token_expiry": "À confirmer",
+      "roles_permissions": "À confirmer",
+      "note": ""
+    },
+    "endpoints": [],
+    "deployment": {
+      "containerized": true,
+      "platform": "Docker",
+      "ci_cd": "GitLab CI"
+    }
+  }
+]

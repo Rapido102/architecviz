@@ -1,0 +1,7 @@
+{
+  "architecture": "Bo Flow Distribution",
+  "type": "FULLSTACK",
+  "version": "0.1.0",
+  "lastUpdated": "2026-05-21",
+  "description": "- node >16 - yarn 3.2.1"
+}

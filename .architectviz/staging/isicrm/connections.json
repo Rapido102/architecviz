@@ -1,0 +1,13 @@
+[
+  {
+    "id": "isicrm_backend_to_edeal_parent",
+    "from": "isicrm_backend",
+    "to": "edeal_parent",
+    "protocol": "REST/HTTPS",
+    "authenticated": true,
+    "description": "ISI-CRM consomme directement les endpoints /customrestapi exposés par E-DEAL/Merlin pour les parcours personnes, demandes, opportunités, interactions et codes promotionnels.",
+    "client": "OpenFeign (OkHttp + Jackson)",
+    "flow": "ISI-CRM → E-DEAL/Merlin /customrestapi pour lecture/écriture métier",
+    "note": "Cette connexion représente le lien applicatif réel entre les deux backends. Le composant crm_api modélise la façade REST consommée ; si souhaité, il pourra être consolidé avec edeal_parent."
+  }
+]

@@ -1,0 +1,23 @@
+[
+  {
+    "id": "backend_spring_to_gesparam_service",
+    "from": "backend_spring",
+    "to": "gesparam_service",
+    "protocol": "REST/HTTPS",
+    "authenticated": true
+  },
+  {
+    "id": "backend_spring_to_db_oracle",
+    "from": "backend_spring",
+    "to": "db_oracle",
+    "protocol": "JDBC",
+    "authenticated": true
+  },
+  {
+    "id": "backend_spring_to_cache_spring_local",
+    "from": "backend_spring",
+    "to": "cache_spring_local",
+    "protocol": "Spring Cache",
+    "authenticated": false
+  }
+]

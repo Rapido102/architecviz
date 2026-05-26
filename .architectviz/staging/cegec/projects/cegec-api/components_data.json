@@ -1,0 +1,46 @@
+[
+  {
+    "id": "db_mysql",
+    "label": "MySQL",
+    "description": "Base MySQL CEGEC utilisée pour stocker les référentiels de paramétrage et l’historique des fiches de gestes commerciaux.",
+    "type": "db",
+    "layer": "Data",
+    "technology": "MySQL",
+    "url": "${DATASOURCE_URL}",
+    "port": 3306,
+    "consumed_via": "Spring Data JDBC + NamedParameterJdbcTemplate",
+    "tables": [
+      {
+        "name": "t38gcod",
+        "purpose": "Référentiel des codes d’opérations et types de gestes commerciaux utilisés pour le formulaire de saisie."
+      },
+      {
+        "name": "t38categorie_geste",
+        "purpose": "Référentiel des catégories de gestes commerciaux exposées dans les paramètres du formulaire."
+      },
+      {
+        "name": "t38fiches",
+        "purpose": "Historique des fiches et gestes commerciaux consultés pour la restitution paginée et le calcul des indicateurs sur 12 mois."
+      }
+    ]
+  },
+  {
+    "id": "cache_redis",
+    "label": "Redis Cache",
+    "description": "Cache Redis Sentinel utilisé pour mémoriser le contexte utilisateur enrichi afin d’éviter de solliciter WS Habilitation et WS Annuaire à chaque appel.",
+    "type": "cache",
+    "layer": "Data",
+    "technology": "Redis",
+    "url": "${REDIS_URL}",
+    "port": 6379,
+    "consumed_via": "Spring Cache + Redis Sentinel",
+    "cached_data": [
+      {
+        "key_pattern": "USER-CONTEXT-*",
+        "ttl": "10h",
+        "purpose": "Contexte utilisateur CEGEC enrichi avec profil, structures autorisées, manager et plafonds d’habilitation.",
+        "note": "Cache manager users ; clé calculée depuis le casId courant."
+      }
+    ]
+  }
+]

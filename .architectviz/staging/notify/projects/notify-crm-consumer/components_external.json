@@ -1,0 +1,34 @@
+[
+  {
+    "id": "iam_oidc",
+    "label": "OIDC Provider",
+    "description": "Fournisseur d'identité OIDC référencé par la configuration de sécurité partagée du consumer CRM Notify.",
+    "type": "iam",
+    "layer": "External",
+    "technology": "OIDC",
+    "url": "${OIDC_ISSUER_URI}",
+    "used_by": [
+      "backend_notify_crm_consumer"
+    ]
+  },
+  {
+    "id": "event_api",
+    "label": "Event API",
+    "description": "Webhook CRM interne appelé pour créer un événement ou une interaction CRM après la livraison d'une notification Notify.",
+    "type": "third-party",
+    "layer": "External",
+    "technology": "REST API (OpenFeign)",
+    "url": "${application.configurations.client.rest.event.url}",
+    "consumed_via": "OpenFeign",
+    "endpoints": [
+      {
+        "path": "/CREER_EVENEMENT",
+        "method": "POST",
+        "description": "Crée un événement CRM à partir du payload Notify transformé."
+      }
+    ],
+    "used_by": [
+      "backend_notify_crm_consumer"
+    ]
+  }
+]

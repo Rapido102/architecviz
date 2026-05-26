@@ -1,0 +1,206 @@
+[
+  {
+    "id": "backend_notify_events_dispatcher",
+    "label": "Notify Events Dispatcher Backend",
+    "description": "Service de dispatch qui consomme des événements métiers, résout les paramètres d’envoi, récupère les coordonnées client puis appelle Notify. Il expose aussi des endpoints techniques de rejeu et de purge de cache.",
+    "type": "backend",
+    "layer": "Backend",
+    "technology": "Java 25 + Spring Boot 4.0.1 + Jersey (JAX-RS) + Spring Kafka + Spring JDBC + OpenFeign",
+    "url": "À confirmer",
+    "port": 8080,
+    "authentication": {
+      "type": "Spring Security (règles effectives à confirmer)",
+      "provider": "Aucun provider explicite détecté",
+      "token_format": "À confirmer",
+      "token_expiry": "À confirmer",
+      "roles_permissions": "À confirmer",
+      "note": "La SecurityFilterChain désactive CSRF mais ne déclare pas explicitement de règles d’autorisation. Vérifier si les endpoints techniques sont protégés par la configuration Spring Security par défaut ou par l’infrastructure."
+    },
+    "endpoints": [
+      {
+        "path": "/api/v1/tech/error/replay/{errorId}",
+        "method": "POST",
+        "description": "Recharge une erreur persistée, rejoue l’événement associé puis supprime l’enregistrement d’erreur.",
+        "authenticated": true,
+        "params": {
+          "query": [],
+          "path": [
+            "errorId"
+          ],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "Response",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_postgres",
+            "resource": "t38err_notify_disp",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "db_postgres",
+            "resource": "t38err_notify_disp",
+            "operation": "DELETE"
+          },
+          {
+            "component_id": "db_postgres",
+            "resource": "t38event_mapping_notify",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "cache_redis",
+            "resource": "notif_params::*",
+            "operation": "GET"
+          },
+          {
+            "component_id": "cache_redis",
+            "resource": "notif_params::*",
+            "operation": "SET"
+          },
+          {
+            "component_id": "clientapi_client_api",
+            "resource": "/private/persons/{ciphered_no_pse}/contacts",
+            "operation": "GET"
+          },
+          {
+            "component_id": "cache_redis",
+            "resource": "OAUTH_TOKEN::{team}",
+            "operation": "GET"
+          },
+          {
+            "component_id": "cache_redis",
+            "resource": "OAUTH_TOKEN::{team}",
+            "operation": "SET"
+          },
+          {
+            "component_id": "cognito_client_api",
+            "resource": "/",
+            "operation": "POST",
+            "note": "Appel effectué sur miss/expiration du cache token."
+          },
+          {
+            "component_id": "notify_client_api",
+            "resource": "/v2/notifications",
+            "operation": "POST"
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/tech/event",
+        "method": "POST",
+        "description": "Joue manuellement un événement métier et déclenche le pipeline complet de dispatch de notification.",
+        "authenticated": true,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [
+            "ArkeaEvent<Object>"
+          ],
+          "headers": []
+        },
+        "response_schema": "Response",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "db_postgres",
+            "resource": "t38event_mapping_notify",
+            "operation": "SELECT"
+          },
+          {
+            "component_id": "cache_redis",
+            "resource": "notif_params::*",
+            "operation": "GET"
+          },
+          {
+            "component_id": "cache_redis",
+            "resource": "notif_params::*",
+            "operation": "SET"
+          },
+          {
+            "component_id": "clientapi_client_api",
+            "resource": "/private/persons/{ciphered_no_pse}/contacts",
+            "operation": "GET"
+          },
+          {
+            "component_id": "cache_redis",
+            "resource": "OAUTH_TOKEN::{team}",
+            "operation": "GET"
+          },
+          {
+            "component_id": "cache_redis",
+            "resource": "OAUTH_TOKEN::{team}",
+            "operation": "SET"
+          },
+          {
+            "component_id": "cognito_client_api",
+            "resource": "/",
+            "operation": "POST",
+            "note": "Appel effectué sur miss/expiration du cache token."
+          },
+          {
+            "component_id": "notify_client_api",
+            "resource": "/v2/notifications",
+            "operation": "POST"
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/tech/mapping/flush",
+        "method": "POST",
+        "description": "Vide le cache Redis des mappings événement → notification.",
+        "authenticated": true,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "Response",
+        "status_codes": [
+          200,
+          500
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": [
+          {
+            "component_id": "cache_redis",
+            "resource": "notif_params::*",
+            "operation": "DEL"
+          }
+        ]
+      },
+      {
+        "path": "/api/v1/check",
+        "method": "GET",
+        "description": "Expose un healthcheck applicatif.",
+        "authenticated": true,
+        "params": {
+          "query": [],
+          "path": [],
+          "body": [],
+          "headers": []
+        },
+        "response_schema": "String",
+        "status_codes": [
+          200
+        ],
+        "validation": "⚠️ NON VALIDÉ",
+        "data_access": []
+      }
+    ],
+    "deployment": {
+      "containerized": true,
+      "platform": "Docker",
+      "ci_cd": "GitLab CI"
+    }
+  }
+]

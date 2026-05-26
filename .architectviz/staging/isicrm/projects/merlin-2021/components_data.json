@@ -1,0 +1,86 @@
+[
+  {
+    "id": "db_oracle",
+    "label": "Oracle",
+    "description": "Base Oracle principale de Merlin / E-DEAL CRM. Elle stocke les personnes, entreprises, demandes, opportunités, interactions, pièces justificatives et tables métier complémentaires exploitées par l’API REST et le moteur CRM.",
+    "type": "db",
+    "layer": "Data",
+    "technology": "Oracle 19c",
+    "url": "${DATASOURCE_URL}",
+    "port": 1521,
+    "consumed_via": "Frontline ORM + OracleDataSource + SQL natif",
+    "tables": [
+      {
+        "name": "Base",
+        "purpose": "Table de contrôle/présence utilisée pour les vérifications de connexion de la plateforme Frontline."
+      },
+      {
+        "name": "Person",
+        "purpose": "Référentiel principal des personnes, prospects et clients."
+      },
+      {
+        "name": "Enterprise",
+        "purpose": "Référentiel des entreprises clientes ou prospects B2B."
+      },
+      {
+        "name": "Demande",
+        "purpose": "Dossiers et demandes métier, avec leur cycle de vie et leurs statuts."
+      },
+      {
+        "name": "Opportunity",
+        "purpose": "Opportunités commerciales et souscriptions en cours."
+      },
+      {
+        "name": "Interaction",
+        "purpose": "Historique des interactions client et tâches de suivi."
+      },
+      {
+        "name": "Messages",
+        "purpose": "Contenu des messages liés aux interactions, notamment pour les échanges PM/Kiamo."
+      },
+      {
+        "name": "Attachment",
+        "purpose": "Pièces jointes et contenus binaires associés aux objets CRM."
+      },
+      {
+        "name": "PieceAFournir_",
+        "purpose": "Pièces justificatives attendues ou reçues dans les dossiers."
+      },
+      {
+        "name": "CodePromo_",
+        "purpose": "Codes promotionnels, libellés et périodes de validité."
+      },
+      {
+        "name": "CodePub_",
+        "purpose": "Codes publicité et classifications de campagnes."
+      },
+      {
+        "name": "AlerteFTO_",
+        "purpose": "Alertes métier rattachées aux personnes et entreprises."
+      },
+      {
+        "name": "FTOHistory_",
+        "purpose": "Historique métier Fortuneo, utilisé notamment pour les retours PM."
+      },
+      {
+        "name": "HistoriqueSuppression_",
+        "purpose": "Traçabilité des opérations de suppression et de purge."
+      },
+      {
+        "name": "HistoriqueClientSalarie_",
+        "purpose": "Historisation spécifique du segment client salarié."
+      }
+    ]
+  },
+  {
+    "id": "mq_kafka",
+    "label": "Kafka",
+    "description": "Bus d’événements Kafka utilisé par Merlin pour publier les synchronisations d’interactions CRM et de consentements personnes.",
+    "type": "mq",
+    "layer": "Data",
+    "technology": "Apache Kafka + spring-kafka 3.2.3",
+    "url": "${KAFKA_BOOTSTRAP}",
+    "consumed_via": "KafkaTemplate",
+    "note": "Topics détectés dans kafka.properties et dans les jobs métier : 3883.merlin.interactions*, 3883.merlin.interactions.noreply, 3883.merlin.consents.21*."
+  }
+]

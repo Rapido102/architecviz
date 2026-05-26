@@ -1,0 +1,47 @@
+[
+  {
+    "id": "db_mysql_cegec",
+    "label": "MySQL CEGEC",
+    "description": "Base de données CEGEC contenant les fiches de gestes commerciaux et les référentiels nécessaires au formulaire métier.",
+    "type": "db",
+    "layer": "Data",
+    "technology": "MySQL",
+    "url": "${cloud_mysql_database_cegec_url}",
+    "port": 3306,
+    "consumed_via": "Spring Data JDBC + NamedParameterJdbcTemplate",
+    "tables": [
+      {
+        "name": "t38fiches",
+        "purpose": "Historique des fiches et gestes commerciaux consultés par l’API."
+      },
+      {
+        "name": "t38gcod",
+        "purpose": "Référentiel des codes de gestes commerciaux et de leurs règles d’affichage."
+      },
+      {
+        "name": "t38categorie_geste",
+        "purpose": "Référentiel des catégories de gestes commerciaux."
+      }
+    ]
+  },
+  {
+    "id": "cache_redis_cegec",
+    "label": "Redis Cache CEGEC",
+    "description": "Cache Redis Sentinel utilisé pour mémoriser le contexte utilisateur enrichi et limiter les appels répétés aux services d’habilitation et d’annuaire.",
+    "type": "cache",
+    "layer": "Data",
+    "technology": "Redis Sentinel",
+    "url": "${cloud_servers_redis_host_ng}:${cloud_servers_redis_port}",
+    "port": 26379,
+    "consumed_via": "Spring Cache + spring-boot-starter-data-redis",
+    "cached_data": [
+      {
+        "endpoint": "/api/v1/app-params",
+        "key_pattern": "USER-CONTEXT-*",
+        "ttl": "10h",
+        "purpose": "Contexte utilisateur enrichi (profil CEGEC, structures autorisées, manager).",
+        "note": "Le préfixe effectif ajoute aussi spring.application.name, env, version et le namespace users."
+      }
+    ]
+  }
+]

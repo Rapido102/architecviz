@@ -1,0 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-brand-bg: #ecece9;
+  --color-brand-ink: #141414;
+  --color-brand-line: #d1d1cf;
+}
+
+@layer base {
+  body {
+    @apply bg-brand-bg text-brand-ink font-sans;
+  }
+}
+
+.react-flow__node {
+  @apply rounded-none border-0 p-0 shadow-none;
+}
+
+.react-flow__edge-path {
+  @apply stroke-brand-ink stroke-[1.5px];
+}
+
+.react-flow__controls {
+    @apply shadow-none border-brand-line bg-white/50 backdrop-blur-sm;
+}
