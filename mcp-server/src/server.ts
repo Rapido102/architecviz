@@ -9,6 +9,7 @@ import { getSection } from './manifest-loader.js';
 import { PROMPTS_DIR } from './paths.js';
 import { stageFragment, listStaged, readStagedEntry } from './staging.js';
 import { validateFragment } from './validation.js';
+import { validateCrossRefs } from './validate-cross-refs.js';
 import { mergeFragmentIntoArchitecture } from './merge.js';
 import { loadArchitectureState } from './architecture-state.js';
 import { deriveConnections } from './derive/connections.js';
@@ -93,8 +94,8 @@ server.tool(
     project_key: z.string().optional().describe('Pour les sections components_* : isole le fragment par projet source. Ignoré pour les sections singleton.'),
   },
   async ({ section_id, fragment, arch_name, project_key }) => {
-    const issues = validateFragment(section_id, fragment);
-    const errors = issues.filter((i) => i.severity === 'error');
+    const schemaIssues = validateFragment(section_id, fragment);
+    const errors = schemaIssues.filter((i) => i.severity === 'error');
     if (errors.length > 0) {
       return textResult({
         status: 'rejected',
@@ -102,8 +103,10 @@ server.tool(
         errors,
       });
     }
+    const crossRefWarnings = validateCrossRefs(arch_name, section_id, fragment);
+    const allWarnings = [...schemaIssues, ...crossRefWarnings];
     const { path, bytes } = stageFragment(arch_name, section_id, fragment, project_key);
-    return textResult({ status: 'staged', path, bytes, warnings: issues });
+    return textResult({ status: 'staged', path, bytes, warnings: allWarnings });
   },
 );
 

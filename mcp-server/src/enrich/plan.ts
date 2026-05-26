@@ -14,17 +14,31 @@ import type { ArchitectureConfig } from '../types.js';
 
 const MISSING = 'À confirmer';
 
+interface DataAccessCandidate {
+  resource: string;
+  operation: string;
+  kind: string;
+  evidence: string;
+}
+
 interface ComponentLike {
   id: string;
   type?: string;
   layer?: string;
   technology?: string;
   description?: string;
-  endpoints?: { path: string; method: string; description?: string; data_access?: unknown[]; authenticated?: boolean }[];
+  endpoints?: {
+    path: string;
+    method: string;
+    description?: string;
+    data_access?: unknown[];
+    authenticated?: boolean;
+  }[];
   routes?: { path: string; api_calls?: string[]; description?: string }[];
   tables?: unknown[];
   cached_data?: unknown[];
   authentication?: Record<string, unknown>;
+  data_access_candidates?: DataAccessCandidate[];
   [key: string]: unknown;
 }
 
@@ -110,10 +124,37 @@ function isMissing(v: unknown): boolean {
   return v === undefined || v === null || v === '' || v === MISSING;
 }
 
+// Normalize endpoint path for loose comparison (handles {id} vs :id, trailing slash).
+function normalizePath(p: string): string {
+  return p
+    .replace(/\{[^}]+\}/g, ':param:')
+    .replace(/:[a-zA-Z_][a-zA-Z0-9_]*/g, ':param:')
+    .replace(/\/$/, '')
+    .toLowerCase();
+}
+
+function parseApiCallStr(call: string): { method: string; path: string } | null {
+  const m = call.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/\S+)$/i);
+  if (!m) return null;
+  return { method: m[1].toUpperCase(), path: m[2] };
+}
+
+// Format data_access_candidates as a compact hint for the task action.
+function candidatesHint(candidates: DataAccessCandidate[] | undefined): string {
+  if (!candidates?.length) return '';
+  const shown = candidates.slice(0, 12);
+  const lines = shown.map(
+    (d) => `  • ${d.operation} ${d.resource} (${d.kind}) ← ${d.evidence}`,
+  );
+  const more = candidates.length > 12 ? `\n  … et ${candidates.length - 12} autre(s)` : '';
+  return `\n\nCandidats auto-détectés (${candidates.length}) — à rattacher aux endpoints :\n${lines.join('\n')}${more}`;
+}
+
 export function enrichmentPlan(archName: string): EnrichmentPlan {
   const { components, arch } = assemble(archName);
   const tasks: EnrichmentTask[] = [];
 
+  // ── per-component gaps ────────────────────────────────────────────────────
   for (const { component: c, project_key, section_id } of components) {
     const hints = filesHint(c);
 
@@ -132,12 +173,15 @@ export function enrichmentPlan(archName: string): EnrichmentPlan {
         // P1 — data_access par endpoint
         const without = c.endpoints.filter((e) => !e.data_access || e.data_access.length === 0);
         if (without.length > 0) {
+          const hint = candidatesHint(c.data_access_candidates);
           tasks.push({
             priority: 1, section: section_id, component_id: c.id, project_key,
             gap: `data_access vide sur ${without.length}/${c.endpoints.length} endpoints de ${c.id}`,
             files_hint: hints,
             prompt_ref: 'prompts/sections/components-backend.md#data_access',
-            action: `Tracer Controller→Service→Repository pour chaque endpoint, remplir data_access[] (component_id cible, resource = table/clé/topic, operation), puis re-stager ${section_id} (project_key="${project_key ?? ''}").`,
+            action:
+              `Tracer Controller→Service→Repository pour chaque endpoint, remplir data_access[] (component_id cible, resource = table/clé/topic, operation), puis re-stager ${section_id} (project_key="${project_key ?? ''}").` +
+              hint,
             done_when: `chaque endpoint de ${c.id} a data_access (sauf endpoints triviaux type /health)`,
           });
         }
@@ -228,6 +272,42 @@ export function enrichmentPlan(archName: string): EnrichmentPlan {
         action: `Rédiger une description métier (1-2 phrases) pour ${c.id}, puis re-stager ${section_id}.`,
         done_when: `${c.id}.description non vide`,
       });
+    }
+  }
+
+  // ── cross-component: api_calls orphelins (sans endpoint backend connu) ────
+  const backends = components.filter((a) => a.component.type === 'backend');
+  const allEndpoints = backends.flatMap((b) => b.component.endpoints ?? []);
+
+  if (allEndpoints.length > 0) {
+    for (const { component: fe, project_key: pk, section_id: sid } of components.filter((a) => a.component.type === 'frontend')) {
+      const unresolved: string[] = [];
+      for (const route of fe.routes ?? []) {
+        for (const call of route.api_calls ?? []) {
+          const parsed = parseApiCallStr(call);
+          if (!parsed) continue;
+          const matched = allEndpoints.some(
+            (e) =>
+              e.method.toUpperCase() === parsed.method &&
+              normalizePath(e.path) === normalizePath(parsed.path),
+          );
+          if (!matched) unresolved.push(`${call} (route: ${route.path})`);
+        }
+      }
+      if (unresolved.length > 0) {
+        const shown = unresolved.slice(0, 6).join(', ');
+        const extra = unresolved.length > 6 ? ` +${unresolved.length - 6} autres` : '';
+        tasks.push({
+          priority: 1, section: sid, component_id: fe.id, project_key: pk,
+          gap: `${unresolved.length} api_call(s) de ${fe.id} sans endpoint backend correspondant`,
+          files_hint: filesHint(fe),
+          prompt_ref: 'prompts/sections/components-frontend.md#routes',
+          action:
+            `Vérifier ces appels non résolus : ${shown}${extra}. ` +
+            `Soit corriger le format "METHOD /path", soit confirmer que le backend expose bien cet endpoint (vérifier extract + data).`,
+          done_when: `tous les api_calls de ${fe.id} matchent un endpoint backend connu via derive_connections`,
+        });
+      }
     }
   }
 

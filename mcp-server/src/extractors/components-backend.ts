@@ -221,6 +221,8 @@ export function extractBackendComponents(projectPath: string): {
       note: '',
     },
     endpoints,
+    // Stored as hints for the enrichment plan — Claude confirms/assigns them as real data_access entries.
+    ...(dataAccessCandidates.length > 0 ? { data_access_candidates: dataAccessCandidates } : {}),
     deployment: detectDeployment(projectPath),
   };
 

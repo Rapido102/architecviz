@@ -4,8 +4,12 @@
 // Two derivation passes:
 //   1. Frontend → Backend  : match component[frontend].routes[].api_calls
 //                            against component[backend].endpoints[] by (method, normalized path)
+//      Matching order:
+//        a. Exact byte match
+//        b. Semantic match (different param syntax — {id} vs :id)
+//        c. Suffix match  (frontend calls /api/v1/users, backend exposes /users)
+//           → handles API gateway/BFF prefix patterns
 //   2. Backend → External  : reverse-lookup component[external].used_by[]
-//                            (any external component that lists a backend id as consumer)
 
 interface Endpoint {
   path: string;
@@ -44,6 +48,18 @@ interface Connection {
   endpoint_mappings?: EndpointMapping[];
 }
 
+export interface UnmatchedApiCall {
+  call: string;
+  from_component: string;
+  from_route: string;
+  near_miss?: {
+    backend: string;
+    endpoint: string;
+    similarity: number;
+    hint: string;
+  };
+}
+
 export interface DeriveSummary {
   frontends: number;
   backends: number;
@@ -51,7 +67,8 @@ export interface DeriveSummary {
   connections_derived: number;
   endpoint_mappings_total: number;
   matched_api_calls: number;
-  unmatched_api_calls: { call: string; from_component: string; from_route: string }[];
+  suffix_matched_api_calls: number;
+  unmatched_api_calls: UnmatchedApiCall[];
 }
 
 export interface DeriveResult {
@@ -69,30 +86,82 @@ function parseApiCall(call: string): { method: string; path: string } | null {
 
 function normalizePath(p: string): string {
   return p
-    // Spring-style: {id}, {userId}
     .replace(/\{[^}]+\}/g, ':param:')
-    // Express/Rails-style: :id, :userId
     .replace(/:[a-zA-Z_][a-zA-Z0-9_]*/g, ':param:')
-    // Trailing slash
     .replace(/\/$/, '')
     .toLowerCase();
 }
 
-function findMatchingEndpoint(
-  endpoints: Endpoint[],
+type MatchKind = 'exact' | 'semantic' | 'suffix';
+
+interface MatchResult {
+  endpoint: Endpoint;
+  kind: MatchKind;
+}
+
+// Exact + semantic match (existing logic).
+function findDirectMatch(endpoints: Endpoint[], method: string, path: string): MatchResult | null {
+  const norm = normalizePath(path);
+  const exact = endpoints.find((e) => e.method.toUpperCase() === method && e.path === path);
+  if (exact) return { endpoint: exact, kind: 'exact' };
+  const semantic = endpoints.find(
+    (e) => e.method.toUpperCase() === method && normalizePath(e.path) === norm,
+  );
+  if (semantic) return { endpoint: semantic, kind: 'semantic' };
+  return null;
+}
+
+// Suffix match: strip leading path segments from the call one by one until
+// a backend endpoint matches. Models gateway/BFF prefix patterns where the
+// frontend calls /api/v1/users but the backend service exposes /users.
+function findSuffixMatch(endpoints: Endpoint[], method: string, callPath: string): MatchResult | null {
+  const segments = normalizePath(callPath).split('/').filter(Boolean);
+  // Start from segment index 1 (drop the first segment) up to n-2 (keep at least one segment).
+  // drop up to all-but-last segment — suffix must keep at least one segment
+  for (let drop = 1; drop < segments.length; drop++) {
+    const suffix = '/' + segments.slice(drop).join('/');
+    const match = endpoints.find(
+      (e) => e.method.toUpperCase() === method && normalizePath(e.path) === suffix,
+    );
+    if (match) return { endpoint: match, kind: 'suffix' };
+  }
+  return null;
+}
+
+// Path similarity score: fraction of normalised segments shared between two paths.
+// Used to find the "nearest miss" endpoint for unmatched calls.
+function pathSimilarity(a: string, b: string): number {
+  const aSeg = normalizePath(a).split('/').filter(Boolean);
+  const bSeg = normalizePath(b).split('/').filter(Boolean);
+  if (aSeg.length === 0 && bSeg.length === 0) return 1;
+  const commonCount = aSeg.filter((s) => bSeg.includes(s)).length;
+  return commonCount / Math.max(aSeg.length, bSeg.length, 1);
+}
+
+interface NearMissResult {
+  backendId: string;
+  endpoint: Endpoint;
+  similarity: number;
+}
+
+// Find the most similar backend endpoint for an unmatched call, cross all backends.
+function findNearMiss(
+  backends: Component[],
   method: string,
   path: string,
-): { endpoint: Endpoint; exact: boolean } | null {
-  const normalizedCall = normalizePath(path);
-  // Exact byte match (same syntax)
-  let match = endpoints.find((e) => e.method.toUpperCase() === method && e.path === path);
-  if (match) return { endpoint: match, exact: true };
-  // Same semantic path (different syntax — e.g., {id} vs :id)
-  match = endpoints.find(
-    (e) => e.method.toUpperCase() === method && normalizePath(e.path) === normalizedCall,
-  );
-  if (match) return { endpoint: match, exact: false };
-  return null;
+): NearMissResult | null {
+  let best: NearMissResult | null = null;
+  for (const be of backends) {
+    // Only compare same-method endpoints.
+    const candidates = (be.endpoints ?? []).filter((e) => e.method.toUpperCase() === method);
+    for (const ep of candidates) {
+      const sim = pathSimilarity(path, ep.path);
+      if (sim >= 0.4 && (!best || sim > best.similarity)) {
+        best = { backendId: be.id, endpoint: ep, similarity: sim };
+      }
+    }
+  }
+  return best;
 }
 
 function dedupeMappings(mappings: EndpointMapping[]): EndpointMapping[] {
@@ -116,6 +185,12 @@ function protocolForExternal(type: string): string {
   return 'REST/HTTPS';
 }
 
+function mappingStatus(kind: MatchKind): string {
+  if (kind === 'exact') return '✅ MAPPÉ';
+  if (kind === 'semantic') return '⚠️ À VÉRIFIER (syntaxe param différente)';
+  return '⚠️ SUFFIX MATCH — préfixe probable (gateway/BFF)';
+}
+
 export function deriveConnections(components: Component[]): DeriveResult {
   const frontends = components.filter((c) => c.type === 'frontend');
   const backends = components.filter((c) => c.type === 'backend');
@@ -124,8 +199,9 @@ export function deriveConnections(components: Component[]): DeriveResult {
   );
 
   const connections: Connection[] = [];
-  const unmatched: DeriveSummary['unmatched_api_calls'] = [];
+  const unmatched: UnmatchedApiCall[] = [];
   let matchedCount = 0;
+  let suffixMatchedCount = 0;
 
   // 1. Frontend → Backend
   for (const fe of frontends) {
@@ -139,17 +215,43 @@ export function deriveConnections(components: Component[]): DeriveResult {
           continue;
         }
 
-        let found: { backendId: string; match: { endpoint: Endpoint; exact: boolean } } | null = null;
+        // Try direct match across all backends.
+        let found: { backendId: string; match: MatchResult } | null = null;
         for (const be of backends) {
-          const m = findMatchingEndpoint(be.endpoints ?? [], parsed.method, parsed.path);
-          if (m) {
-            found = { backendId: be.id, match: m };
-            break;
+          const m = findDirectMatch(be.endpoints ?? [], parsed.method, parsed.path);
+          if (m) { found = { backendId: be.id, match: m }; break; }
+        }
+
+        // Fall back to suffix match if direct failed.
+        if (!found) {
+          for (const be of backends) {
+            const m = findSuffixMatch(be.endpoints ?? [], parsed.method, parsed.path);
+            if (m) {
+              found = { backendId: be.id, match: m };
+              suffixMatchedCount++;
+              break;
+            }
           }
         }
 
         if (!found) {
-          unmatched.push({ call, from_component: fe.id, from_route: route.path });
+          // Record near-miss to help Claude fix the mismatch.
+          const nm = findNearMiss(backends, parsed.method, parsed.path);
+          unmatched.push({
+            call,
+            from_component: fe.id,
+            from_route: route.path,
+            near_miss: nm
+              ? {
+                  backend: nm.backendId,
+                  endpoint: `${nm.endpoint.method} ${nm.endpoint.path}`,
+                  similarity: Math.round(nm.similarity * 100) / 100,
+                  hint: nm.similarity >= 0.7
+                    ? 'chemin très similaire — vérifier le préfixe gateway'
+                    : 'chemin partiellement similaire — vérifier method + path',
+                }
+              : undefined,
+          });
           continue;
         }
 
@@ -159,7 +261,7 @@ export function deriveConnections(components: Component[]): DeriveResult {
           backend_endpoint: found.match.endpoint.path,
           method: parsed.method,
           frontend_pages: [route.path],
-          status: found.match.exact ? '✅ MAPPÉ' : '⚠️ À VÉRIFIER',
+          status: mappingStatus(found.match.kind),
         };
 
         const arr = byBackend.get(found.backendId) ?? [];
@@ -219,6 +321,7 @@ export function deriveConnections(components: Component[]): DeriveResult {
         0,
       ),
       matched_api_calls: matchedCount,
+      suffix_matched_api_calls: suffixMatchedCount,
       unmatched_api_calls: unmatched,
     },
   };
